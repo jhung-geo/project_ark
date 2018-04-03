@@ -208,6 +208,7 @@ void toggle_LED() {
  */
 void handleData(byte data) {
 	if (state == STATE_INIT) {
+    //Serial.flush();
 		// The first received byte designates the command
 		handleCommand(data);
 	} else if (state == STATE_ADDRESS) {

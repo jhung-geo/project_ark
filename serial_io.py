@@ -1,24 +1,20 @@
 import time
 import serial
-#import string
+import serial.tools.list_ports
+import string
+import sys
 
+#Default I2C slave address
+address = '26'
 
-#address = 0
-#register = 0
-#length = 0
-write_read = 0 #0 is Write, R is Read
+STATUS_OK = 0
+STATUS_ERROR = 1        
+
+ARK_PID = 67
+ARK_VID = 9025
 
 #convert string to hex
 toHex = lambda x:"".join([hex(ord(c))[2:].zfill(2) for c in x])
-#def toHex(s):
-    #lst = []
-    #for ch in s:
-        #hv = hex(ord(ch)).replace('0x', '')
-        #if len(hv) == 1:
-            #hv = '0'+hv
-        #lst.append(hv)
-    
-    #return reduce(lambda x,y:x+y, lst)
 
 #convert hex repr to string
 def toStr(s):
@@ -34,83 +30,135 @@ def convert_hex_to_ascii(h):
     chars_in_reverse.reverse()
     return ''.join(chars_in_reverse)
 
-# configure the serial connections (the parameters differs on the device you are connecting to)
-ser = serial.Serial(
-    port='COM3',
-    baudrate=115200
-    #parity=serial.PARITY_ODD,
-    #stopbits=serial.STOPBITS_TWO,
-    #bytesize=serial.SEVENBITS
-)
 
-ser.isOpen()
+def i2c_address(addr):
+    address = '{:02X}'.format(addr)#str(addr)#int(str(addr))
+    #print(address)
 
-print 'Enter your commands below.\r\nInsert "exit" to leave the application.'
+def enum():
+    ser = serial.Serial()
+    port_list = []
+    a=serial.tools.list_ports.comports()
+    for w in a:
+        #print( w.device, w.pid, w.vid, w.name)
+        if w.pid == ARK_PID and w.vid == ARK_VID:
+            #print( w.device, w.pid, w.vid, w.name)
+            ser.baudrate=115200
+            ser.port=w.device
+            ser.open()
+            while ser.isOpen() == False:
+                print "not yet open"
+            port_list += w.device
+    return(ser)
 
-input=1
-while 1 :
-    # get keyboard input
-    input = raw_input(">> ")
-        # Python 3 users
-        # input = input(">> ")    
-    if input == 'exit':
-        ser.close()
-        exit()
-    else:
-        x_list = input.split(' ')
-        wbuffer = ''        
-        for s in range(len(x_list)):
-            #print x_list[s]
-            if x_list[s] == 'A':
-                s = s+1
-                address = x_list[s]#int(x_list[s],16)
-            elif x_list[s] == 'a':
-                s += 1
-                register = x_list[s]#int(x_list[s],16)
-            elif x_list[s] == 'l':
-                s += 1
-                length = x_list[s]#int(x_list[s])
-            elif x_list[s] == 'w':
-                write_read = 0
-                for x in range(0,int(length,16)):
-                    s += 1
-                    wbuffer += x_list[s]
-            elif x_list[s] == 'r':
-                write_read = 1        
-        
-        
-        out = ''
-        if write_read == 0:
-            out += '41'
-            out += address
-            out += '4C'
-            out += length
-            out += '57'
-            out += register
-            out += wbuffer
-        else:
-            out += '41'
-            out += address
-            out += '4C'
-            out += '01'
-            out += '57'   
-            out += register
-            out += '4C'
-            out += length
-            out += '52'
-        input = toStr(out)
-        print(out)
-        print(input)
-        # send the character to the device
-        # (note that I happend a \r\n carriage return and line feed to the characters - this is requested by my device)
-        #input = convert_hex_to_ascii(0x41264C01579D4C0352)
-        ser.write(input)# + '\r\n')
-        readback = ''
-        # let's wait one second before reading output (let's give device time to answer)
-        #time.sleep(1)
-        while ser.inWaiting() > 0:
-            readback += ser.read(1)
+def read(uid, reg, length, data):
+    """
+    Reads data from a target demo device.
 
-        if readback != '':
-            print ">>" + toHex(readback)
+    First performs a write to the device with the target register
+    as the payload before reading back the device data.
 
+    Args:
+      uid:    Protocol-specific identification data for the target
+              device.
+      reg:    The register address to start reading from.
+      length: The number of bytes to read.
+      data:   The list to fill with read data.
+
+    Returns:
+      status: Operation status code.
+      count:  The number of bytes read from the target.
+    """
+    
+    uid.flushInput()
+    uid.flushOutput()
+    num_read = 0
+    out = ''
+    out += '41'
+    out += address
+    out += '4C'
+    out += '01'
+    out += '57'
+    if reg < 0x10:
+        out += '0'
+    out += '{:02X}'.format(reg)#str(reg)
+    out += '4C'
+    out += '{:02X}'.format(length)
+    out += '52'
+     
+    data = ''   
+    input = toStr(out)
+    uid.write(input)
+    # let's wait one second before reading output (let's give device time to answer)
+    time.sleep(float(length)*0.0015)
+    while uid.inWaiting() > 0:
+        data += uid.read(1)          
+    #if data != '':
+	#print "all good"
+    #else:
+	#print "BADBAD"
+	
+    if data != '':
+	print ">>" + toHex(data)
+
+    num_read = len(data)
+    status = STATUS_OK
+
+    return status, num_read
+
+
+def write(uid, reg, data):
+    """
+    Writes data to a target demo device.
+
+    Args:
+      uid:    Protocol-specific identification data for the target
+              device.
+      reg:    The register address to start writing to.
+      data:   The list of bytes to write to the target.
+
+    Returns:
+      status: Operation status code.
+      count:  The number of bytes written to the target.
+    """
+    num_written = 0
+    
+    num_read = 0
+    out = ''
+    out += '41'
+    out += address
+    out += '4C'
+    if len(data) < 10:
+	out += '0'
+    out += str(len(data)+1)#'{:02X}'.format(length)
+    out += '57'
+    if reg < 0x10:
+	out += '0'
+    out += '{:02X}'.format(reg)#str(reg)
+    for i in range(len(data)):
+	out += '{:02X}'.format(data[i])#str(data[i])
+    input = toStr(out)
+    print(out)
+    uid.write(input)
+    # let's wait one second before reading output (let's give device time to answer)
+    time.sleep(float(len(data))*0.0015)    
+    
+    num_written = len(data)
+    status = STATUS_OK
+
+    return status, num_written
+
+##Test code below
+temp = [0]
+seri = enum()
+i2c_address(0x26)
+time.sleep(4)
+status, num_read = read(seri, 0x80, 5, temp)
+wb = [0x20]
+status, num_write = write(seri, 0x80, wb)
+time.sleep(1)
+status, num_read = read(seri, 0x80, 5, temp)
+#print(temp)
+seri.close()
+
+exit()
