@@ -47,7 +47,7 @@ def enum():
             ser.port=w.device
             ser.open()
             while ser.isOpen() == False:
-                print "not yet open"
+                pass#print "not yet open"
             port_list += w.device
     return(ser)
 
@@ -78,28 +78,28 @@ def read(uid, reg, length, data):
     out += address
     out += '4C'
     out += '01'
-    out += '57'
-    if reg < 0x10:
+    out += '77'#'57'
+    if reg < 0x10 and reg != 0:
         out += '0'
     out += '{:02X}'.format(reg)#str(reg)
     out += '4C'
     out += '{:02X}'.format(length)
     out += '52'
-     
-    data = ''   
+       
     input = toStr(out)
     uid.write(input)
+    readback = ''
+    #print(out)
     # let's wait one second before reading output (let's give device time to answer)
-    time.sleep(float(length)*0.0015)
+    time.sleep(0.005)#float(length)*0.002)#15)
     while uid.inWaiting() > 0:
-        data += uid.read(1)          
-    #if data != '':
-	#print "all good"
-    #else:
-	#print "BADBAD"
+        readback += uid.read(1)          
 	
-    if data != '':
-	print ">>" + toHex(data)
+    if readback != '':
+	for i in range(len(readback)):
+	    #print ">>" + toHex(readback[i:i+1])
+	    data.append(int(toHex(readback[i:i+1]),16))
+	    i=i+1
 
     num_read = len(data)
     status = STATUS_OK
@@ -148,17 +148,30 @@ def write(uid, reg, data):
 
     return status, num_written
 
+
+def close(handle):
+    handle.close()
+    return STATUS_OK
+    
 ##Test code below
-temp = [0]
+temp = []
 seri = enum()
 i2c_address(0x26)
 time.sleep(4)
-status, num_read = read(seri, 0x80, 5, temp)
-wb = [0x20]
-status, num_write = write(seri, 0x80, wb)
-time.sleep(1)
-status, num_read = read(seri, 0x80, 5, temp)
-#print(temp)
-seri.close()
-
+i = 10
+#while i > 0:
+    #status, num_read = read(seri, 0x83, 4, temp)
+    #i -= 1
+    #time.sleep(0.01)
+status, num_read = read(seri, 0x80, 1, temp)
+#time.sleep(1)
+print(temp[0])
+#time.sleep(0.1)
+temp[0] ^= 0x08
+status, num_write = write(seri, 0x80, temp)
+#time.sleep(0.2)
+status, num_read = read(seri, 0x80, 1, temp)
+#print(temp[0] * 16777216 + temp[1] * 65536 + temp[2] * 256 + temp[3])
+#print(temp[0])
+close(seri)
 exit()

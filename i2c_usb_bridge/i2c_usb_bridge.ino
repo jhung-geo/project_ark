@@ -390,5 +390,7 @@ void escapeSendData(byte data) {
   } else {
     Serial.write(data);
   }
+
+  Serial.flush();
 }
 
