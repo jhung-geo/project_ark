@@ -109,7 +109,7 @@ void setup() {
 	pinMode(LED_BUILTIN, OUTPUT);
 	Wire.begin();
 	initAdapter();
-  Wire.setClock(37000);
+	Wire.setClock(100000);
 }
 
 void initAdapter() {
@@ -138,7 +138,7 @@ void loop() {
   initAdapter();
   address = 0x26;
   //length = 1;
-  data = 0x9d;
+  data = 0x83;
   Wire.beginTransmission(address);
   Wire.write(data);
   Wire.endTransmission(false);
@@ -192,10 +192,10 @@ int incomingByte = 0;    // for incoming serial data
 void toggle_LED() {
 	if (led_state){
 		digitalWrite(LED_BUILTIN, LOW);
-    led_state = false;
-	}else{
+    	led_state = false;
+	} else {
 		digitalWrite(LED_BUILTIN, HIGH);
-    led_state = true;
+    	led_state = true;
 	}
 	//led_state = ~led_state;		
 }
@@ -305,37 +305,37 @@ void handleCommand(byte command) {
 }
 
 void handleIdent() {
-  int len = ident.length();
-  char buf[len+1];
-  ident.toCharArray(buf, len+1);
-  escapeSendData(len);
-  // We can use "Serial.write" here because we know the IDENT string
-  // doesn't contain any characters which would have to get escaped.
-  Serial.write((uint8_t*)buf, len);
+  	int len = ident.length();
+  	char buf[len+1];
+  	ident.toCharArray(buf, len+1);
+  	escapeSendData(len);
+  	// We can use "Serial.write" here because we know the IDENT string
+  	// doesn't contain any characters which would have to get escaped.
+  	Serial.write((uint8_t*)buf, len);
 }
 
 void handleWireRead() {
-  Wire.requestFrom((uint8_t)address, (uint8_t)length, (uint8_t)1);//(uint8_t)(restart ? 0 : 1));
-  restart = false;
+  	Wire.requestFrom((uint8_t)address, (uint8_t)length, (uint8_t)1);//(uint8_t)(restart ? 0 : 1));
+  	restart = false;
 
-  //toggle_LED();
+  	//toggle_LED();
   
-  byte a = Wire.available();
-  //escapeSendData(CHAR_ESCAPE);
-  //escapeSendData(a);
-  if (a != 0) {
-    byte r = 0;
-    for (byte i = 0; i < a; i++) {
-      r = Wire.read();
-      escapeSendData(r);
-    }
-  }
-  //escapeSendData(CHAR_RESET);
-  if (Wire.available() != 0) {
-    state = STATE_ERROR;
-  } else {
-    state = STATE_INIT;
-  }
+  	byte a = Wire.available();
+  	//escapeSendData(CHAR_ESCAPE);
+  	//escapeSendData(a);
+  	if (a != 0) {
+    	byte r = 0;
+    	for (byte i = 0; i < a; i++) {
+      		r = Wire.read();
+      		escapeSendData(r);
+    	}
+  	}
+  	//escapeSendData(CHAR_RESET);
+  	if (Wire.available() != 0) {
+    	state = STATE_ERROR;
+  	} else {
+    	state = STATE_INIT;
+  	}
 }
 
 /**
@@ -352,12 +352,12 @@ void handleReceivedSequence(byte data) {
 		escape = false;
 		switch (data) {
 			case CHAR_ESCAPED_ESCAPE:  // Will cause a "\" (ESCAPE) to get added to the buffer
-			handleData(CHAR_ESCAPE);
-			break;
+				handleData(CHAR_ESCAPE);
+				break;
 
 			case CHAR_ESCAPED_RESET:  // Will cause a <ESC> (RESET) to get added to the buffer
-			handleData(CHAR_RESET);
-			break;
+				handleData(CHAR_RESET);
+				break;
 
 			default:
 				// Every other character causes an error while being in an escape sequence
@@ -381,16 +381,20 @@ void handleReceivedSequence(byte data) {
  * @return void
  */
 void escapeSendData(byte data) {
-  if (data == CHAR_ESCAPE) {
-    Serial.write(CHAR_ESCAPE);
-    Serial.write(CHAR_ESCAPED_ESCAPE);
-  } else if (data == CHAR_RESET) {
-    Serial.write(CHAR_ESCAPE);
-    Serial.write(CHAR_ESCAPED_RESET);
-  } else {
-    Serial.write(data);
-  }
+  	if (data == CHAR_ESCAPE) {
 
-  Serial.flush();
+    	Serial.write(CHAR_ESCAPE);
+    	Serial.write(CHAR_ESCAPED_ESCAPE);
+
+  	} else if (data == CHAR_RESET) {
+
+    	Serial.write(CHAR_ESCAPE);
+    	Serial.write(CHAR_ESCAPED_RESET);
+
+  	} else {
+
+    	Serial.write(data);
+
+  	}
 }
 

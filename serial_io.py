@@ -69,7 +69,9 @@ def read(uid, reg, length, data):
       status: Operation status code.
       count:  The number of bytes read from the target.
     """
-    
+    #block cannot exceed 32 bytes
+    if length > 32:
+	return STATUS_ERROR
     uid.flushInput()
     uid.flushOutput()
     num_read = 0
@@ -91,11 +93,15 @@ def read(uid, reg, length, data):
     readback = ''
     #print(out)
     # let's wait one second before reading output (let's give device time to answer)
-    time.sleep(0.005)#float(length)*0.002)#15)
+    #time.sleep(0.005)#float(length)*0.002)#15)
+    while uid.in_waiting == 0:
+	pass
+    
     while uid.inWaiting() > 0:
         readback += uid.read(1)          
 	
     if readback != '':
+	del data[:]
 	for i in range(len(readback)):
 	    #print ">>" + toHex(readback[i:i+1])
 	    data.append(int(toHex(readback[i:i+1]),16))
@@ -121,9 +127,13 @@ def write(uid, reg, data):
       status: Operation status code.
       count:  The number of bytes written to the target.
     """
+    
+    #block cannot exceed 32 bytes
+    if len(data) > 31:
+	return STATUS_ERROR    
     num_written = 0
     
-    num_read = 0
+    #num_read = 0
     out = ''
     out += '41'
     out += address
@@ -138,10 +148,13 @@ def write(uid, reg, data):
     for i in range(len(data)):
 	out += '{:02X}'.format(data[i])#str(data[i])
     input = toStr(out)
-    print(out)
+    #print(out)
     uid.write(input)
     # let's wait one second before reading output (let's give device time to answer)
-    time.sleep(float(len(data))*0.0015)    
+    #time.sleep(float(len(data))*0.0015)    
+    
+    while uid.out_waiting > 0:
+	pass    
     
     num_written = len(data)
     status = STATUS_OK
@@ -152,26 +165,27 @@ def write(uid, reg, data):
 def close(handle):
     handle.close()
     return STATUS_OK
-    
+"""    
 ##Test code below
 temp = []
 seri = enum()
 i2c_address(0x26)
 time.sleep(4)
-i = 10
-#while i > 0:
-    #status, num_read = read(seri, 0x83, 4, temp)
-    #i -= 1
-    #time.sleep(0.01)
-status, num_read = read(seri, 0x80, 1, temp)
-#time.sleep(1)
-print(temp[0])
-#time.sleep(0.1)
-temp[0] ^= 0x08
-status, num_write = write(seri, 0x80, temp)
-#time.sleep(0.2)
-status, num_read = read(seri, 0x80, 1, temp)
-#print(temp[0] * 16777216 + temp[1] * 65536 + temp[2] * 256 + temp[3])
-#print(temp[0])
+i = 100
+print len(temp)
+while i > 0:
+    status, num_read = read(seri, 0x80, 1, temp)
+    temp[0] ^= 0x08
+    if len(temp) > 1:
+	print "SUN TIN WONG"
+	print i
+	print len(temp)
+	break
+    status, num_write = write(seri, 0x80, temp)
+    #time.sleep(0.2)
+    status, num_read = read(seri, 0x80, 1, temp)
+    print(temp[0])    
+    i -= 1
 close(seri)
 exit()
+"""
