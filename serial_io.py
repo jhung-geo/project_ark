@@ -93,7 +93,7 @@ def read(uid, reg, length, data):
     readback = ''
     #print(out)
     # let's wait one second before reading output (let's give device time to answer)
-    #time.sleep(0.005)#float(length)*0.002)#15)
+    time.sleep(0.005)#float(length)*0.002)#15)
     while uid.in_waiting == 0:
 	pass
     
@@ -129,35 +129,81 @@ def write(uid, reg, data):
     """
     
     #block cannot exceed 32 bytes
-    if len(data) > 31:
-	return STATUS_ERROR    
+    #print len(data)
+    #if len(data) > 31:
+	##print "size too big"
+	#return STATUS_ERROR    
     num_written = 0
+    uid.flushInput()
+    uid.flushOutput()    
     
     #num_read = 0
     out = ''
     out += '41'
     out += address
     out += '4C'
-    if len(data) < 10:
-	out += '0'
-    out += str(len(data)+1)#'{:02X}'.format(length)
-    out += '57'
-    if reg < 0x10:
-	out += '0'
+    if len(data) > 16:
+	t = 16
+    else:
+	t = len(data)    
+    out += '{:02X}'.format(t+1)
+    
+    if (len(data)) > 16:
+	out += '77'
+    else:
+	out += '57'
+   
     out += '{:02X}'.format(reg)#str(reg)
-    for i in range(len(data)):
+    for i in range(0,t):#range(len(data)):
 	out += '{:02X}'.format(data[i])#str(data[i])
     input = toStr(out)
     #print(out)
     uid.write(input)
-    # let's wait one second before reading output (let's give device time to answer)
-    #time.sleep(float(len(data))*0.0015)    
     
     while uid.out_waiting > 0:
-	pass    
+	pass   
+    
+    if len(data) > 16:
+	out =''
+	out += '4C'
+	t = len(data) - t    
+	#out += str(len(data)+1)#'{:02X}'.format(length)
+	out += '{:02X}'.format(t)
+	out += '57'
+	#if reg < 0x10 and reg != 0:
+	    #out += '0'
+	#out += '{:02X}'.format(reg)#str(reg)
+	
+	for i in range(t,len(data)):#range(len(data)):
+	    #print '{:02X}'.format(data[i])
+	    out += '{:02X}'.format(data[i])#str(data[i])
+	input = toStr(out)
+	#print(out)
+	uid.write(input)
+	# let's wait one second before reading output (let's give device time to answer)
+	#time.sleep(float(len(data))*0.0015)    
+	
+	while uid.out_waiting > 0:
+	    pass    
+	
+    readback = ''
+    while uid.in_waiting == 0:
+	pass
+    
+    status = STATUS_OK
+    while uid.inWaiting() > 0:
+	rc = uid.read(1)
+	#if rc != 5:
+	    #status = STATUS_ERROR
+	#readback += rc#uid.read(1)
+	#print ord(rc)
+	
+    
+    #print ord(readback)
+    
     
     num_written = len(data)
-    status = STATUS_OK
+    
 
     return status, num_written
 

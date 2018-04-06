@@ -101,6 +101,8 @@ char data = 0;
 boolean escape = false;
 boolean led_state = false;
 
+byte length_echo = 0;
+
 String ident = "Arduino I2C-to-USB 1.0"; 
 
 void setup() {
@@ -166,13 +168,13 @@ int incomingByte = 0;    // for incoming serial data
 	
 		if (state == STATE_ERROR) {
 			// Signal the PC an error
-			Serial.write(CHAR_RESET);
+			Serial.write(error);//CHAR_RESET);
 		}
 
 		// Read data from serial port
 		data = Serial.read();
 
-		if (data == CHAR_RESET) {
+		if (0){//data == CHAR_RESET) {
 			// When the RESET character has been received cause a reset
 			initAdapter();
 		} else {
@@ -183,7 +185,7 @@ int incomingByte = 0;    // for incoming serial data
 
 		if (state == STATE_ERROR) {
 			// Signal the PC an error
-			Serial.write(CHAR_RESET);
+			Serial.write(error);//CHAR_RESET);
 		}
 		
 	}
@@ -242,9 +244,14 @@ void handleData(byte data) {
 			if (Wire.endTransmission(restart ? false : true) != 0) {
 				state = STATE_ERROR;
 				error = ERROR_SENDDATA;
-				toggle_LED();
+				//toggle_LED();
 				return;
 			}
+      if (!restart){
+        //escapeSendData(state);
+        Serial.write(state);
+        Serial.flush();
+      }
 			restart = false;
 			state = STATE_INIT;
 		}
@@ -366,7 +373,7 @@ void handleReceivedSequence(byte data) {
 				break;
 		}
 	} else {
-		if (data == CHAR_ESCAPE) {
+		if (0){//		  data == CHAR_ESCAPE) {
 			escape = true;
 		} else {
 			handleData(data);
@@ -396,5 +403,6 @@ void escapeSendData(byte data) {
     	Serial.write(data);
 
   	}
+   Serial.flush();
 }
 
