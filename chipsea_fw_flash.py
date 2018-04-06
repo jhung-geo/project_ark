@@ -1,8 +1,6 @@
 import sys
-#import csv
 import math
 import matplotlib.pyplot as plt
-#import aardvark as acom
 import arduino_io as acom
 import time
 
@@ -29,7 +27,6 @@ ver = []
 pos = 32
 # setting up the communication
 acom.i2c_address(0x26)
-#adevices = acom.enum()  # ardvark
 file_name = sys.argv[1]
 fp = open(file_name, "rU")
 fp.seek(0,2)
@@ -106,7 +103,6 @@ if(ser.isOpen()):
     
     while pos+32 < size:    
         del data[:]        
-        #status, num_read = acom.read(device, 0x00, 1, temp)
         status, num_read = acom.read(device, reg, 32, data)
         if status != 0:
             print ('I2C error @ READBACK')
@@ -114,10 +110,10 @@ if(ser.isOpen()):
             print pos
             break
         for x in range(0, 32):
-            print x
-            print pos
-            print len(data)
-            print len(ver)
+            #print x
+            #print pos
+            #print len(data)
+            #print len(ver)
             if data[x] != ver[pos]:
                 print ('READBACK error @ byte %d'% pos)
                 sys.exit(0)
@@ -132,9 +128,9 @@ if(ser.isOpen()):
     data = [0x55,0xa5,0x51]
     status, num_written = acom.write(device, 0xa1, data)
     
-    time.sleep(0.054)   
-    data = [0x55,0xa5,0xaa]
-    status, num_written = acom.write(device, 0xa1, data)    
+    #time.sleep(0.054)   
+    #data = [0x55,0xa5,0xaa]
+    #status, num_written = acom.write(device, 0xa1, data)    
      
     
     print('ALL DONE')    

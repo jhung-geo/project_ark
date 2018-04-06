@@ -2,9 +2,16 @@
 Project ARK's goal is to replace existing Aardvark I2C bridge with Arduino Uno
 board (Arduino Replaces aardvarK).  The project contains:
 
-	serial_io.py		Python interface that allow user to interact with the 
-						bridge
-	i2c_usb_bridge.ino	Arduino board FW
+	arduino_io.py						Python interface that allow user to interact with the 
+										bridge
+	
+	i2c_usb_bridge\i2c_usb_bridge.ino	Arduino board FW
+	
+	chipsea_fw_flash.py					Chipsea firmware flash script that uses
+										the bridge
+										
+	ark_plot.py							Sample plot script that read Chipsea EVB
+										
 	
 The Arduino board is programmed to act as a virtual serial port to host machine.
 User can send and receive data by issuing serial command:
@@ -18,3 +25,7 @@ User can send and receive data by issuing serial command:
 For example, to read 3 bytes from device 0x26, register 0x9d:
 
 	"A 26 a 9d l 03 r"
+
+
+Refer chipsea_fw_flash.py and ark_plot.py for how to use arduino_io module to
+read and write to I2C slave

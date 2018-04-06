@@ -94,7 +94,7 @@ def read(uid, reg, length, data):
     #print(out)
     # let's wait one second before reading output (let's give device time to answer)
     if length < 5:
-	wait_time = 0.005
+	wait_time = 0.006
     else:
 	wait_time = float(length)*0.001
     time.sleep(wait_time)#float(length)*0.001)#15)
@@ -215,27 +215,3 @@ def write(uid, reg, data):
 def close(handle):
     handle.close()
     return STATUS_OK
-"""    
-##Test code below
-temp = []
-seri = enum()
-i2c_address(0x26)
-time.sleep(4)
-i = 100
-print len(temp)
-while i > 0:
-    status, num_read = read(seri, 0x80, 1, temp)
-    temp[0] ^= 0x08
-    if len(temp) > 1:
-	print "SUN TIN WONG"
-	print i
-	print len(temp)
-	break
-    status, num_write = write(seri, 0x80, temp)
-    #time.sleep(0.2)
-    status, num_read = read(seri, 0x80, 1, temp)
-    print(temp[0])    
-    i -= 1
-close(seri)
-exit()
-"""
