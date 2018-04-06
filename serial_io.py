@@ -81,8 +81,8 @@ def read(uid, reg, length, data):
     out += '4C'
     out += '01'
     out += '77'#'57'
-    if reg < 0x10 and reg != 0:
-        out += '0'
+    #if reg < 0x10 and reg != 0:
+        #out += '0'
     out += '{:02X}'.format(reg)#str(reg)
     out += '4C'
     out += '{:02X}'.format(length)
@@ -93,7 +93,11 @@ def read(uid, reg, length, data):
     readback = ''
     #print(out)
     # let's wait one second before reading output (let's give device time to answer)
-    time.sleep(0.005)#float(length)*0.002)#15)
+    if length < 5:
+	wait_time = 0.005
+    else:
+	wait_time = float(length)*0.001
+    time.sleep(wait_time)#float(length)*0.001)#15)
     while uid.in_waiting == 0:
 	pass
     

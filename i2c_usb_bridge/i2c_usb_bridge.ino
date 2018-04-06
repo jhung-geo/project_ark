@@ -388,6 +388,7 @@ void handleReceivedSequence(byte data) {
  * @return void
  */
 void escapeSendData(byte data) {
+  /*
   	if (data == CHAR_ESCAPE) {
 
     	Serial.write(CHAR_ESCAPE);
@@ -398,7 +399,7 @@ void escapeSendData(byte data) {
     	Serial.write(CHAR_ESCAPE);
     	Serial.write(CHAR_ESCAPED_RESET);
 
-  	} else {
+  	} else*/ {
 
     	Serial.write(data);
 
