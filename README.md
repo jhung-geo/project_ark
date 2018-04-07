@@ -12,7 +12,12 @@ board (Arduino Replaces aardvarK).  The project contains:
 										
 	ark_plot.py							Sample plot script that read Chipsea EVB
 										
-	
+
+To use the scripts and firmware code, you need to have:
+
+	Python 2.7 with Pyserial install (run "pip install serial")
+	Arduino IDE (download here https://www.arduino.cc/en/Main/Software)
+
 The Arduino board is programmed to act as a virtual serial port to host machine.
 User can send and receive data by issuing serial command:
 
