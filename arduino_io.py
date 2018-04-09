@@ -5,7 +5,7 @@ import string
 import sys
 
 #Default I2C slave address
-address = '26'
+#address = '26'
 
 STATUS_OK = 0
 STATUS_ERROR = 1        
@@ -31,10 +31,43 @@ def convert_hex_to_ascii(h):
     return ''.join(chars_in_reverse)
 
 
-def i2c_address(addr):
-    address = '{:02X}'.format(addr)#str(addr)#int(str(addr))
-    #print(address)
+def i2c_address(uid, addr):    
+    if addr > 0x7f:
+	print "I2C address out of range"
+	return
+    num_written = 0
+    uid.flushInput()
+    uid.flushOutput()    
+    out = ''
+    out += '41'
+    out += '{:02X}'.format(addr)
+    #print(out)
+    input = toStr(out)
+    uid.write(input)
+    
+    while uid.out_waiting > 0:
+	pass   
 
+""" NOT YET FUNCTIONAL
+def i2c_clock(uid, clock):
+    if clock > 40 or clock < 0:
+	print "I2C clock out of range"
+	return
+    num_written = 0
+    uid.flushInput()
+    uid.flushOutput()    
+    out = ''
+    out += '43'
+    #print toStr('{:02X}'.format(clock))
+    #print toStr(hex(clock))
+    out += str(clock)
+    print(out)
+    input = toStr(out)
+    uid.write(input)
+    
+    while uid.out_waiting > 0:
+	pass       
+"""      
 def enum():
     ser = serial.Serial()
     port_list = []
@@ -51,6 +84,7 @@ def enum():
             port_list += w.device
     return(ser)
 
+    
 def read(uid, reg, length, data):
     """
     Reads data from a target demo device.
@@ -76,8 +110,8 @@ def read(uid, reg, length, data):
     uid.flushOutput()
     num_read = 0
     out = ''
-    out += '41'
-    out += address
+    #out += '41'
+    #out += address
     out += '4C'
     out += '01'
     out += '77'#'57'
@@ -143,8 +177,8 @@ def write(uid, reg, data):
     
     #num_read = 0
     out = ''
-    out += '41'
-    out += address
+    #out += '41'
+    #out += address
     out += '4C'
     if len(data) > 16:
 	t = 16

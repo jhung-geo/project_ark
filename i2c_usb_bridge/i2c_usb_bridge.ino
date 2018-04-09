@@ -1,40 +1,4 @@
 // I2C to USB Adapter using Arduino
-// by Bernhard Kraft <kraftb@think-open.at>
-
-/**
- * This sketch can get loaded onto an Arduino to use it as USB to I2C Adapter.
- * It uses the Wire library. So take a look at the documentation of the Wire
- * libarary about the pins being used as SDA/SCL. For most Arduino boards this
- * will be analog input pin 4 for SDA and analog input pin 5 for SCL.
- *
- * On the USB side the default serial link of the Arduino is used. A protocol
- * is defined which allows to perform xfer operations on the I2C bus. The
- * protocol defines messages which get sent from the PC to the Arduino and
- * which get answered by a reply from the Arduino. So the communication is
- * bounded in blocks.
- *
- * It is clear that there needs to be a way to synchronize the PC and the
- * Arduino. For this purpose the <ESC> character (0x1B, .27) is used as RESET
- * character. Whenever it is received by the Arduino it goes into a defined
- * state.
- *
- * Having only this convention would disallow the <ESC> character in payload
- * data. So another character is used to quote/escape the <ESC> character. This
- * character is the "\" character (0x5C, .92). To send a literal <ESC> value
- * the sequence "0x5C 0xB1" has to get sent (0xB1 is the <ESC> character 0x1B
- * with its nibbles exchanged). To send a literal "\" character the sequence
- * "0x5C 0xC5" has to get sent. For all other combinations of "0x5C" with
- * another character an error is generated (except for "0x5C 0x1B" which is an
- * error being signaled after the "\").
- *
- * When an error is encountered the Arduino sends an <ESC> character (0x1B, not
- * the escape sequence) and stops further processing of serial data until it
- * gets reset by a <ESC> character from the PC.
- *
- * The exception mentioned above for the sequence "0x5C 0x1B" results from
- * the fact, that 0x1B is the RESET character. So it is possible to cause
- * a RESET when a quote character has already been sent.
- */
 
 #include <Wire.h>
 
@@ -71,23 +35,26 @@ void toggle_LED();
 #define CMD_GET_IDENT       	'I'
 #define CMD_GET_ADDRESS       	'a'
 #define CMD_GET_LENGTH        	'l'
+#define CMD_SET_CLOCK			'C'
 
-#define STATE_INIT    0x00
-#define STATE_ERROR   0x01
-#define STATE_ADDRESS 0x02
+
+#define STATE_INIT		0x00
+#define STATE_ERROR		0x01
+#define STATE_ADDRESS	0x02
 #define STATE_LENGTH    0x03
-#define STATE_WRITE   0x05
+#define STATE_WRITE   	0x05
+#define STATE_CLOCK		0x06
 
-#define CHAR_RESET    0x1B    // It is somehow misleading that <ESC> is used for RESET
-#define CHAR_ESCAPE   0x5C    // And "\" is the escape character.
+#define CHAR_RESET		0x1B    // It is somehow misleading that <ESC> is used for RESET
+#define CHAR_ESCAPE		0x5C    // And "\" is the escape character.
 
-#define CHAR_ESCAPED_RESET    0xB1
-#define CHAR_ESCAPED_ESCAPE 0xC5
+#define CHAR_ESCAPED_RESET		0xB1
+#define CHAR_ESCAPED_ESCAPE		0xC5
 
-#define ERROR_NONE        'N'
+#define ERROR_NONE        	'N'
 #define ERROR_UNESCAPE      'U'
 #define ERROR_LENGTH        'L'
-#define ERROR_READ        'R'
+#define ERROR_READ        	'R'
 #define ERROR_WRITEDATA     'W'
 #define ERROR_SENDDATA      'S'
 
@@ -134,41 +101,13 @@ void loop() {
 		initAdapter();    
 	}
 
-	//toggle_LED();
-
-/*
-  initAdapter();
-  address = 0x26;
-  //length = 1;
-  data = 0x83;
-  Wire.beginTransmission(address);
-  Wire.write(data);
-  Wire.endTransmission(false);
-  length = 3;
-  //restart = true;
-  handleWireRead();
-  
-
-int incomingByte = 0;    // for incoming serial data
-
-
-  // send data only when you receive data:
-  if (Serial.available() > 0) {
-  
-    // read the incoming byte:
-    incomingByte = Serial.read();
-  
-    // say what you got:
-    //Serial.print((char)incomingByte);
-    Serial.print(incomingByte, HEX);
-  }*/
- 
-
 	if (Serial.available()) {
 	
 		if (state == STATE_ERROR) {
 			// Signal the PC an error
 			Serial.write(error);//CHAR_RESET);
+			
+			initAdapter(); //Go back to init state after error is reported, JH
 		}
 
 		// Read data from serial port
@@ -186,12 +125,15 @@ int incomingByte = 0;    // for incoming serial data
 		if (state == STATE_ERROR) {
 			// Signal the PC an error
 			Serial.write(error);//CHAR_RESET);
+			
+			initAdapter(); //Go back to init state after error is reported, JH
 		}
 		
 	}
 }
 
 void toggle_LED() {
+  /*
 	if (led_state){
 		digitalWrite(LED_BUILTIN, LOW);
     	led_state = false;
@@ -199,7 +141,7 @@ void toggle_LED() {
 		digitalWrite(LED_BUILTIN, HIGH);
     	led_state = true;
 	}
-	//led_state = ~led_state;		
+ */
 }
 
 /**
@@ -209,8 +151,11 @@ void toggle_LED() {
  * @return void;
  */
 void handleData(byte data) {
+	byte rv = 0;
+  byte i2c_clock = 0;
+	
 	if (state == STATE_INIT) {
-    //Serial.flush();
+		//Serial.flush();
 		// The first received byte designates the command
 		handleCommand(data);
 	} else if (state == STATE_ADDRESS) {
@@ -241,20 +186,29 @@ void handleData(byte data) {
 			length--;
 		}
 		if (length == 0) {
-			if (Wire.endTransmission(restart ? false : true) != 0) {
-				state = STATE_ERROR;
-				error = ERROR_SENDDATA;
-				//toggle_LED();
-				return;
+			rv = Wire.endTransmission(restart ? false : true);
+				if (rv != 0) {
+					state = STATE_ERROR;
+					error = ERROR_SENDDATA + 10 + rv;
+					return;
+				}
+				
+			toggle_LED();
+			
+			if (!restart){
+				//escapeSendData(state);
+				Serial.write(state);
+				Serial.flush();
 			}
-      if (!restart){
-        //escapeSendData(state);
-        Serial.write(state);
-        Serial.flush();
-      }
 			restart = false;
 			state = STATE_INIT;
 		}
+	} else if (state == STATE_CLOCK) {
+    i2c_clock = data;
+		if (i2c_clock <= 40) {
+			Wire.setClock(int(i2c_clock*10000));
+		}
+		state = STATE_INIT;
 	}
 }
 
@@ -307,7 +261,10 @@ void handleCommand(byte command) {
 		case CMD_GET_IDENT:
 			handleIdent();
 			break;
-
+			
+		case CMD_SET_CLOCK:
+			state = STATE_CLOCK;
+			break;
 	}
 }
 
@@ -324,8 +281,6 @@ void handleIdent() {
 void handleWireRead() {
   	Wire.requestFrom((uint8_t)address, (uint8_t)length, (uint8_t)1);//(uint8_t)(restart ? 0 : 1));
   	restart = false;
-
-  	//toggle_LED();
   
   	byte a = Wire.available();
   	//escapeSendData(CHAR_ESCAPE);
@@ -336,6 +291,7 @@ void handleWireRead() {
       		r = Wire.read();
       		escapeSendData(r);
     	}
+		toggle_LED();
   	}
   	//escapeSendData(CHAR_RESET);
   	if (Wire.available() != 0) {
@@ -355,7 +311,8 @@ void handleWireRead() {
  * @return void
  */
 void handleReceivedSequence(byte data) {    
-	if (escape) {
+	if (0){//escape) {
+		/*
 		escape = false;
 		switch (data) {
 			case CHAR_ESCAPED_ESCAPE:  // Will cause a "\" (ESCAPE) to get added to the buffer
@@ -371,6 +328,7 @@ void handleReceivedSequence(byte data) {
 				state = STATE_ERROR;
 				error = ERROR_UNESCAPE;
 				break;
+				*/
 		}
 	} else {
 		if (0){//		  data == CHAR_ESCAPE) {
@@ -404,6 +362,6 @@ void escapeSendData(byte data) {
     	Serial.write(data);
 
   	}
-   Serial.flush();
+	Serial.flush();
 }
 

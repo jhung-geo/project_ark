@@ -26,7 +26,7 @@ data =[]
 ver = []
 pos = 32
 # setting up the communication
-acom.i2c_address(0x26)
+acom.i2c_address(ser,0x26)
 file_name = sys.argv[1]
 fp = open(file_name, "rU")
 fp.seek(0,2)
