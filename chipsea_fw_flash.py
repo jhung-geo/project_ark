@@ -3,8 +3,8 @@ import math
 import matplotlib.pyplot as plt
 import arduino_io as acom
 import time
-
 import serial
+import progressbar
 
 ser = serial.Serial()
 a=serial.tools.list_ports.comports()
@@ -35,8 +35,7 @@ reg = 0x00
 
 
 if(ser.isOpen()):
-#if(0):
-    device = ser#adevices[0] # just using the first AFE found on the bus
+    device = ser
     
     temp = []
     
@@ -67,6 +66,10 @@ if(ser.isOpen()):
     status, num_written = acom.write(device, 0xa1, data)    
     time.sleep(0.005)
     
+    write_bar = progressbar.ProgressBar(max_value=size)
+    
+    print "Writing Flash" + "\n"
+    
     while pos < size:
         del data[:]        
         for x in range(0, 32):
@@ -79,20 +82,20 @@ if(ser.isOpen()):
             
         status, num_written = acom.write(device, reg, data)
         
-        #while num_written != 32:
-            #pass
-        
         if status != 0:
-            print ('I2C error ')
+            print ('Write error ')
             print status
             print pos
-            break
+            sys.exit(0)
         reg += 1
         reg %= 256
         time.sleep(0.01)
         #print ("write block %d ", pos)
+        write_bar.update(pos)
         
-    fp.close()         
+    fp.close()
+    
+    print "\n" + "\n" + "Readback and Verify" + "\n"
     
     #READBACK AND VERIFY
     pos = 0
@@ -101,6 +104,8 @@ if(ser.isOpen()):
     data = [0x55,0xa5,0xa5]
     status, num_written = acom.write(device, 0xa1, data)
     
+    read_bar = progressbar.ProgressBar(max_value=size)
+    
     while pos+32 < size:    
         del data[:]        
         status, num_read = acom.read(device, reg, 32, data)
@@ -108,20 +113,20 @@ if(ser.isOpen()):
             print ('I2C error @ READBACK')
             print status
             print pos
-            break
+            sys.exit(0)
         for x in range(0, 32):
             #print x
             #print pos
             #print len(data)
             #print len(ver)
             if data[x] != ver[pos]:
-                print ('READBACK error @ byte %d'% pos)
+                print ('Verify error @ byte %d'% pos)
                 sys.exit(0)
             pos += 1
         reg += 1
         reg %= 256
-        time.sleep(0.01)    
-    
+        time.sleep(0.01)
+        read_bar.update(pos)
     
     #SIGN AND CLOSE
     time.sleep(0.052)   
@@ -133,7 +138,7 @@ if(ser.isOpen()):
     #status, num_written = acom.write(device, 0xa1, data)    
      
     
-    print('ALL DONE')    
+    print "\n" + "\n" + "ALL DONE"
 else:
     print('Error:No device detected!')
 

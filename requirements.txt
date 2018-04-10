@@ -1,0 +1,2 @@
+serial==0.0.51
+progressbar2==3.37.0
