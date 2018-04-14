@@ -4,15 +4,14 @@ import serial.tools.list_ports
 import string
 import sys
 
-#Default I2C slave address
-#address = '26'
+#Known I2C slave address
+addr_list = [0x26, 0x40]
 
 STATUS_OK = 0
 STATUS_ERROR = 1        
 
-ARK_PID = 67
-ARK_VID = 9025
-
+#ARK_PID = 67
+#ARK_VID = 9025
 #convert string to hex
 toHex = lambda x:"".join([hex(ord(c))[2:].zfill(2) for c in x])
 
@@ -48,7 +47,7 @@ def i2c_address(uid, addr):
     while uid.out_waiting > 0:
 	pass   
 
-""" NOT YET FUNCTIONAL
+
 def i2c_clock(uid, clock):
     if clock > 40 or clock < 0:
 	print "I2C clock out of range"
@@ -58,23 +57,31 @@ def i2c_clock(uid, clock):
     uid.flushOutput()    
     out = ''
     out += '43'
-    #print toStr('{:02X}'.format(clock))
-    #print toStr(hex(clock))
     out += str(clock)
-    print(out)
+    #print(out)
     input = toStr(out)
     uid.write(input)
     
     while uid.out_waiting > 0:
 	pass       
-"""      
+
+def address_check(port): #Scan all possible slave address to find the valid one
+    for a in range(len(addr_list)):
+	i2c_address(port,addr_list[a])
+	status,num_write = write(port,0xdd,[0x00])	
+	if status == STATUS_OK:
+	    return
+	    
+    print "No valid address can be found"
+	
+
 def enum():
     ser = serial.Serial()
     port_list = []
     a=serial.tools.list_ports.comports()
     for w in a:
-        #print( w.device, w.pid, w.vid, w.name)
-        if w.pid == ARK_PID and w.vid == ARK_VID:
+        print( w.device, w.pid, w.vid, w.name)
+        if w.pid and w.vid:  #Looking for a COM port with PID and VID
             #print( w.device, w.pid, w.vid, w.name)
             ser.baudrate=115200
             ser.port=w.device
@@ -82,7 +89,13 @@ def enum():
             while ser.isOpen() == False:
                 pass#print "not yet open"
             port_list += w.device
-    return(ser)
+        else:
+            print "Not Arduino"
+    
+    time.sleep(4) #wait 4 second
+    
+    address_check(ser)    
+    return([ser])
 
     
 def read(uid, reg, length, data):
@@ -110,14 +123,10 @@ def read(uid, reg, length, data):
     uid.flushOutput()
     num_read = 0
     out = ''
-    #out += '41'
-    #out += address
     out += '4C'
     out += '01'
-    out += '77'#'57'
-    #if reg < 0x10 and reg != 0:
-        #out += '0'
-    out += '{:02X}'.format(reg)#str(reg)
+    out += '77'
+    out += '{:02X}'.format(reg)
     out += '4C'
     out += '{:02X}'.format(length)
     out += '52'
@@ -166,7 +175,9 @@ def write(uid, reg, data):
       count:  The number of bytes written to the target.
     """
     
-    #block cannot exceed 32 bytes
+    #I2C buffer only 32 bytes, including address.  For write data over 31 bytes long send first
+    #16 byte w/ address, then restart the write to send the rest
+    
     #print len(data)
     #if len(data) > 31:
 	##print "size too big"
@@ -175,10 +186,7 @@ def write(uid, reg, data):
     uid.flushInput()
     uid.flushOutput()    
     
-    #num_read = 0
     out = ''
-    #out += '41'
-    #out += address
     out += '4C'
     if len(data) > 16:
 	t = 16
@@ -191,9 +199,9 @@ def write(uid, reg, data):
     else:
 	out += '57'
    
-    out += '{:02X}'.format(reg)#str(reg)
-    for i in range(0,t):#range(len(data)):
-	out += '{:02X}'.format(data[i])#str(data[i])
+    out += '{:02X}'.format(reg)
+    for i in range(0,t):
+	out += '{:02X}'.format(data[i])
     input = toStr(out)
     #print(out)
     uid.write(input)
@@ -205,16 +213,11 @@ def write(uid, reg, data):
 	out =''
 	out += '4C'
 	t = len(data) - t    
-	#out += str(len(data)+1)#'{:02X}'.format(length)
 	out += '{:02X}'.format(t)
 	out += '57'
-	#if reg < 0x10 and reg != 0:
-	    #out += '0'
-	#out += '{:02X}'.format(reg)#str(reg)
 	
-	for i in range(t,len(data)):#range(len(data)):
-	    #print '{:02X}'.format(data[i])
-	    out += '{:02X}'.format(data[i])#str(data[i])
+	for i in range(t,len(data)):
+	    out += '{:02X}'.format(data[i])
 	input = toStr(out)
 	#print(out)
 	uid.write(input)
@@ -231,21 +234,17 @@ def write(uid, reg, data):
     status = STATUS_OK
     while uid.inWaiting() > 0:
 	rc = uid.read(1)
-	#if rc != 5:
-	    #status = STATUS_ERROR
-	#readback += rc#uid.read(1)
-	#print ord(rc)
-	
-    
-    #print ord(readback)
-    
+	if ord(rc) != 5:
+	    status = STATUS_ERROR
     
     num_written = len(data)
-    
-
     return status, num_written
 
 
 def close(handle):
     handle.close()
     return STATUS_OK
+
+'''test code'''
+#aio = enum()[0]
+#close(aio)

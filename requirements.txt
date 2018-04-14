@@ -1,2 +1,2 @@
-serial==0.0.51
+pyserial==3.4
 progressbar2==3.37.0

@@ -78,7 +78,7 @@ void setup() {
 	pinMode(LED_BUILTIN, OUTPUT);
 	Wire.begin();
 	initAdapter();
-	Wire.setClock(100000);
+	Wire.setClock(400000);
 }
 
 void initAdapter() {
@@ -329,7 +329,7 @@ void handleReceivedSequence(byte data) {
 				error = ERROR_UNESCAPE;
 				break;
 				*/
-		}
+		//}
 	} else {
 		if (0){//		  data == CHAR_ESCAPE) {
 			escape = true;

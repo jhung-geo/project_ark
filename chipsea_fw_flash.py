@@ -6,18 +6,7 @@ import time
 import serial
 import progressbar
 
-ser = serial.Serial()
-a=serial.tools.list_ports.comports()
-for w in a:
-    ser.baudrate=115200
-    ser.port=w.device
-    ser.open()
-    i = 10
-    while ser.isOpen() == False:
-        i -= 1
-        if i == 0:
-            print "Cannot open serial port in 10 tries."
-            exit()
+ser = acom.enum()[0]
 
 time.sleep(4)
 
