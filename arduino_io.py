@@ -134,8 +134,8 @@ def read(uid, reg, length, data):
 	nput = toStr(out)
 	uid.write(input)
 	readback = ''
-    #print(out)
-    # let's wait one second before reading output (let's give device time to answer)
+	#print(out)
+	# let's wait one second before reading output (let's give device time to answer)
 	if length < 5:
 		wait_time = 0.006
 	else:
@@ -154,10 +154,10 @@ def read(uid, reg, length, data):
 			data.append(int(toHex(readback[i:i+1]),16))
 			i=i+1
 
-    num_read = len(data)
-    status = STATUS_OK
+	num_read = len(data)
+	status = STATUS_OK
 
-    return status, num_read
+	return status, num_read
 
 
 def write(uid, reg, data):
