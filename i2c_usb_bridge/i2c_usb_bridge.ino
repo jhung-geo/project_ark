@@ -77,6 +77,11 @@ void setup() {
 	Serial.begin(115200);
 	pinMode(LED_BUILTIN, OUTPUT);
 	Wire.begin();
+ 
+  // Disable internal pullups
+  pinMode(SDA, INPUT);
+  pinMode(SCL, INPUT);
+  
 	initAdapter();
 	Wire.setClock(400000);
 }
