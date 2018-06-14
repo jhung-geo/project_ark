@@ -36,6 +36,8 @@ void toggle_LED();
 #define CMD_GET_ADDRESS       	'a'
 #define CMD_GET_LENGTH        	'l'
 #define CMD_SET_CLOCK			'C'
+#define CMD_PULLUP_ON        	'P'
+#define CMD_PULLUP_OFF			'p'
 
 
 #define STATE_INIT		0x00
@@ -74,13 +76,13 @@ String ident = "Arduino I2C-to-USB 1.0";
 
 void setup() {
 	// initialize the serial communication:
-	Serial.begin(115200);
+	Serial.begin(230400);
 	pinMode(LED_BUILTIN, OUTPUT);
 	Wire.begin();
  
-  // Disable internal pullups
-  pinMode(SDA, INPUT);
-  pinMode(SCL, INPUT);
+	// Disable internal pullups
+	pinMode(SDA, INPUT);
+	pinMode(SCL, INPUT);
   
 	initAdapter();
 	Wire.setClock(400000);
@@ -209,7 +211,7 @@ void handleData(byte data) {
 			state = STATE_INIT;
 		}
 	} else if (state == STATE_CLOCK) {
-    i2c_clock = data;
+		i2c_clock = data;
 		if (i2c_clock <= 40) {
 			Wire.setClock(int(i2c_clock*10000));
 		}
@@ -270,6 +272,20 @@ void handleCommand(byte command) {
 		case CMD_SET_CLOCK:
 			state = STATE_CLOCK;
 			break;
+			
+		case CMD_PULLUP_OFF:
+			// Disable internal pullups
+			pinMode(SDA, INPUT);
+			pinMode(SCL, INPUT);
+			break;			
+			
+		case CMD_PULLUP_ON:
+			// Enable internal pullups
+			pinMode(SDA, INPUT_PULLUP);
+			pinMode(SCL, INPUT_PULLUP);
+			break;			
+			
+			
 	}
 }
 

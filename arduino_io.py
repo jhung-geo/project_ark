@@ -37,8 +37,24 @@ def i2c_address(addr):
         out += '41'
         out += '{:02X}'.format(addr)
     return out
-
-
+'''
+I2C Pull-up control, still under development
+'''
+def pullup(serial_port,state):
+    #out = ''
+    #uid = (port, addr)
+    if state:
+        out = '50'
+    else:
+        out = '70'
+    serial_port.flushInput()
+    serial_port.flushOutput()    
+    foo = toStr(out)
+    serial_port.write(foo)
+    while serial_port.out_waiting > 0:
+        pass
+    
+    
 def i2c_clock(uid, clock):
     if clock > 40 or clock < 0:
         print "I2C clock out of range"
@@ -73,13 +89,22 @@ def enum():
         print(w.device, w.pid, w.vid, w.name)
         if w.pid and w.vid:  # Looking for a COM port with PID and VID
             ser = serial.Serial()
-            ser.baudrate = 115200
+            ser.baudrate = 230400#115200
             ser.port = w.device
             ser.open()
             while ser.isOpen() == False:
                 pass # print "not yet open"
             time.sleep(4) # wait 4 second
+            
+            #pullup(ser,True)
+            #time.sleep(1) # Delay for the line to be pulled up
+            
             devices += address_check(ser)
+            #print len(devices)
+            #if len(devices) == 0:
+                #print "pull it up"
+                #pullup(ser,True)
+                #devices += address_check(ser)
         else:
             print "Not Arduino"
     return(devices)
@@ -125,11 +150,11 @@ def read(uid, reg, length, data):
     readback = ''
     # print(out)
     # let's wait one second before reading output (let's give device time to answer)
-    if length < 5:
-        wait_time = 0.006
-    else:
-        wait_time = float(length)*0.001
-    time.sleep(wait_time)#float(length)*0.001)#15)
+    #if length < 5:
+        #wait_time = 0.006
+    #else:
+        #wait_time = float(length)*0.001
+    #time.sleep(wait_time)#float(length)*0.001)#15)
     while uid[0].in_waiting == 0:
         pass
 
