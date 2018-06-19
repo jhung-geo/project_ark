@@ -8,14 +8,14 @@ import progressbar
 
 ser = acom.enum()[0]
 
-time.sleep(4)
+#time.sleep(4)
 
 temp =[]
 data =[]    
 ver = []
 pos = 32
 # setting up the communication
-acom.i2c_address(ser,0x26)
+#acom.i2c_address(ser,0x26)
 file_name = sys.argv[1]
 fp = open(file_name, "rU")
 fp.seek(0,2)
@@ -23,7 +23,7 @@ size = fp.tell()
 reg = 0x00
 
 
-if(ser.isOpen()):
+if True:#(ser.isOpen()):
     device = ser
     
     temp = []
@@ -103,6 +103,9 @@ if(ser.isOpen()):
             print status
             print pos
             sys.exit(0)
+        #print num_read
+        #print pos
+        #time.sleep(0.01)
         for x in range(0, 32):
             #print x
             #print pos
@@ -114,7 +117,7 @@ if(ser.isOpen()):
             pos += 1
         reg += 1
         reg %= 256
-        time.sleep(0.01)
+        #time.sleep(0.01)
         read_bar.update(pos)
     
     #SIGN AND CLOSE

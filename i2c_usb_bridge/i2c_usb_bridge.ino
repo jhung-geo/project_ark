@@ -72,11 +72,13 @@ boolean led_state = false;
 
 byte length_echo = 0;
 
+byte read_buf[32];
+
 String ident = "Arduino I2C-to-USB 1.0"; 
 
 void setup() {
 	// initialize the serial communication:
-	Serial.begin(230400);
+	Serial.begin(921600);
 	pinMode(LED_BUILTIN, OUTPUT);
 	Wire.begin();
  
@@ -309,11 +311,15 @@ void handleWireRead() {
   	if (a != 0) {
     	byte r = 0;
     	for (byte i = 0; i < a; i++) {
-      		r = Wire.read();
-      		escapeSendData(r);
+      		read_buf[i] = Wire.read();
+      		//Serial.write(r);//escapeSendData(r);
     	}
-		toggle_LED();
+		//toggle_LED();
   	}
+    //for (byte j = 0; j < a; j++) {
+      Serial.write(read_buf, a);
+    //}
+  	Serial.flush();
   	//escapeSendData(CHAR_RESET);
   	if (Wire.available() != 0) {
     	state = STATE_ERROR;
@@ -332,7 +338,7 @@ void handleWireRead() {
  * @return void
  */
 void handleReceivedSequence(byte data) {    
-	if (0){//escape) {
+	//if (0){//escape) {
 		/*
 		escape = false;
 		switch (data) {
@@ -351,13 +357,13 @@ void handleReceivedSequence(byte data) {
 				break;
 				*/
 		//}
-	} else {
-		if (0){//		  data == CHAR_ESCAPE) {
-			escape = true;
-		} else {
+	//} else {
+		//if (0){//		  data == CHAR_ESCAPE) {
+		//	escape = true;
+		//} else {
 			handleData(data);
-		}
-	}
+		//}
+	//}
 }
 
 /**
@@ -383,6 +389,6 @@ void escapeSendData(byte data) {
     	Serial.write(data);
 
   	}
-	Serial.flush();
+	//Serial.flush();
 }
 

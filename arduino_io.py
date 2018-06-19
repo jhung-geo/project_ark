@@ -89,7 +89,7 @@ def enum():
         print(w.device, w.pid, w.vid, w.name)
         if w.pid and w.vid:  # Looking for a COM port with PID and VID
             ser = serial.Serial()
-            ser.baudrate = 230400#115200
+            ser.baudrate = 921600#115200
             ser.port = w.device
             ser.open()
             while ser.isOpen() == False:
