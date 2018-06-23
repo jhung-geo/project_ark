@@ -14,6 +14,7 @@ void escapeSendData(byte data);
 void handleReceivedSequence(byte data);
 void handleData(byte data);
 void handleWireRead();
+void handleDioRead();
 void handleIdent();
 void toggle_LED();
 
@@ -39,6 +40,10 @@ void toggle_LED();
 #define CMD_PULLUP_ON        	'P'
 #define CMD_PULLUP_OFF			'p'
 
+#define CMD_DIO_PIN         'D'
+#define CMD_DIO_MODE        'M'
+#define CMD_DIO_READ        '<'
+#define CMD_DIO_WRITE       '>'
 
 #define STATE_INIT		0x00
 #define STATE_ERROR		0x01
@@ -46,6 +51,10 @@ void toggle_LED();
 #define STATE_LENGTH    0x03
 #define STATE_WRITE   	0x05
 #define STATE_CLOCK		0x06
+
+#define STATE_DIO_PIN     0x08
+#define STATE_DIO_MODE    0x09
+#define STATE_DIO_WRITE   0x0A
 
 #define CHAR_RESET		0x1B    // It is somehow misleading that <ESC> is used for RESET
 #define CHAR_ESCAPE		0x5C    // And "\" is the escape character.
@@ -69,6 +78,9 @@ boolean restart = false;
 char data = 0;
 boolean escape = false;
 boolean led_state = false;
+
+byte dio_pin = 0;
+byte dio_mode = 3;
 
 byte length_echo = 0;
 
@@ -148,7 +160,7 @@ void toggle_LED() {
 		digitalWrite(LED_BUILTIN, HIGH);
     	led_state = true;
 	}
- */
+  */
 }
 
 /**
@@ -216,6 +228,33 @@ void handleData(byte data) {
 			Wire.setClock(int(i2c_clock*10000));
 		}
 		state = STATE_INIT;
+	} 
+	else if (state == STATE_DIO_PIN) {
+    dio_pin = data;
+    state = STATE_INIT;
+	} else if (state == STATE_DIO_MODE) {
+    dio_mode = data;
+    if (dio_pin > 1 && dio_pin < 14) {
+      switch (dio_mode) {
+        case 0:
+          pinMode(dio_pin, INPUT);
+          break;
+        case 1:
+          pinMode(dio_pin, OUTPUT);
+          break;
+        case 2:
+          pinMode(dio_pin, INPUT_PULLUP);
+          break;
+        default:
+          break;
+      }
+    }
+    state = STATE_INIT;
+	} else if (state == STATE_DIO_WRITE) {
+    if (dio_pin > 1 && dio_pin < 14) {
+      digitalWrite(dio_pin, data == 0 ? LOW : HIGH);
+    }
+    state = STATE_INIT;
 	}
 }
 
@@ -285,7 +324,21 @@ void handleCommand(byte command) {
 			pinMode(SCL, INPUT_PULLUP);
 			break;			
 			
-			
+		case CMD_DIO_PIN:
+      state = STATE_DIO_PIN;
+      break;
+
+    case CMD_DIO_MODE:
+      state = STATE_DIO_MODE;
+      break;
+
+    case CMD_DIO_READ:
+      handleDioRead();
+      break;
+
+    case CMD_DIO_WRITE:
+      state = STATE_DIO_WRITE;
+      break;
 	}
 }
 
@@ -320,6 +373,15 @@ void handleWireRead() {
   	} else {
     	state = STATE_INIT;
   	}
+}
+
+void handleDioRead() {
+    if (dio_pin > 1 && dio_pin < 14) {
+      byte level = digitalRead(dio_pin);
+      Serial.write(level == LOW ? 0 : 1);
+      Serial.flush();
+    }
+    state = STATE_INIT;
 }
 
 /**

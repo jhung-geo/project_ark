@@ -2,16 +2,16 @@
 Project ARK's goal is to replace existing Aardvark I2C bridge with Arduino Uno
 board (Arduino Replaces aardvarK).  The project contains:
 
-	arduino_io.py						Python interface that allow user to interact with the 
+	arduino_io.py						Python interface that allow user to interact with the
 										bridge
-	
+
 	i2c_usb_bridge\i2c_usb_bridge.ino	Arduino board FW
-	
+
 	chipsea_fw_flash.py					Chipsea firmware flash script that uses
 										the bridge
-										
+
 	afe_plot.py							Sample plot script that reads NextInput AFE
-										
+
 
 To use the scripts and firmware code, you need to have:
 
@@ -26,14 +26,22 @@ User can send and receive data by issuing serial command:
 	'l' set the length of read or write buffer
 	'w' indicates it's a write operation
 	'r' indicates it's a read operation
-	
+
 For example, to read 3 bytes from device 0x26, register 0x9d:
 
 	"A 26 a 9d l 03 r"
 
+You can also control the Arduino digital GPIOs with the following commands:
+
+	'D' sets the pin number (2 through 13)
+	'M' sets the pin mode (0 = input, 1 = output, 2 = input pullup)
+	'<' reads from the digital pin (0 or 1)
+	'>' writes to the digital pin (0 or 1)
+
+Pin config and IO capabilities are accessible through the APIs dio_mode, dio_read, and dio_write in arduino_io.py
 
 Refer chipsea_fw_flash.py and afe_plot.py for how to use arduino_io module to
-read and write to I2C slave.  
+read and write to I2C slave.
 
 To use chipsea_fw_flash.py to flash firmware to Chipsea board, run:
 
