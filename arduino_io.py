@@ -48,13 +48,76 @@ def pullup(serial_port,state):
     else:
         out = '70'
     serial_port.flushInput()
-    serial_port.flushOutput()    
+    serial_port.flushOutput()
     foo = toStr(out)
     serial_port.write(foo)
     while serial_port.out_waiting > 0:
         pass
-    
-    
+
+'''
+GPIO control, still under development
+'''
+def dio_pin(serial_port, pin):
+    if pin < 2 or pin > 13:
+        print "Digital IO pin out of range"
+        return STATUS_ERROR
+    out = '44'
+    out += str(pin)
+    serial_port.flushInput()
+    serial_port.flushOutput()
+    out = toStr(out)
+    serial_port.write(out)
+    while serial_port.out_waiting > 0:
+        pass
+    return STATUS_OK
+
+def dio_mode(serial_port, pin, mode):
+    if dio_pin(serial_port, pin) != STATUS_OK:
+        return
+    if mode < 0 or mode > 2:
+        print "Digital IO mode out of range"
+        return
+    out = '4D'
+    out += str(mode)
+    serial_port.flushInput()
+    serial_port.flushOutput()
+    out = toStr(out)
+    serial_port.write(out)
+    while serial_port.out_waiting > 0:
+        pass
+
+
+def dio_read(serial_port, pin):
+    if dio_pin(serial_port, pin) != STATUS_OK:
+        return
+    out = '3C'
+    serial_port.flushInput()
+    serial_port.flushOutput()
+    out = toStr(out)
+    serial_port.write(out)
+
+    while serial_port.in_waiting == 0:
+        pass
+    readback = serial_port.read(1)
+    return int(toHex(readback[0:1]),16)
+
+
+def dio_write(serial_port, pin, level):
+    if dio_pin(serial_port, pin) != STATUS_OK:
+        return
+    if level < 0 or level > 1:
+        print "Digital IO level out of range"
+        return
+    out = '3E'
+    out += str(level)
+    serial_port.flushInput()
+    serial_port.flushOutput()
+    out = toStr(out)
+    serial_port.write(out)
+    while serial_port.out_waiting > 0:
+        pass
+    return
+
 def i2c_clock(uid, clock):
     if clock > 40 or clock < 0:
         print "I2C clock out of range"
@@ -95,10 +158,10 @@ def enum():
             while ser.isOpen() == False:
                 pass # print "not yet open"
             time.sleep(4) # wait 4 second
-            
+
             #pullup(ser,True)
             #time.sleep(1) # Delay for the line to be pulled up
-            
+
             devices += address_check(ser)
             #print len(devices)
             #if len(devices) == 0:
