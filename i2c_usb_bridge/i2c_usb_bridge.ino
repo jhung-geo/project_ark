@@ -90,7 +90,7 @@ String ident = "Arduino I2C-to-USB 1.0";
 
 void setup() {
 	// initialize the serial communication:
-	Serial.begin(921600);
+	Serial.begin(115200);//921600);
 	pinMode(LED_BUILTIN, OUTPUT);
 	Wire.begin();
  
@@ -187,7 +187,7 @@ void handleData(byte data) {
 	} else if (state == STATE_LENGTH) {
 		// The LENGTH command defines the number of bytes which
 		// should get read/written
-		if (data > BUFFER_LENGTH) {
+		if (data > 32/*BUFFER_LENGTH*/) {
 			state = STATE_ERROR;
 			error = ERROR_LENGTH;
 		} else {

@@ -152,7 +152,7 @@ def enum():
         print(w.device, w.pid, w.vid, w.name)
         if w.pid and w.vid:  # Looking for a COM port with PID and VID
             ser = serial.Serial()
-            ser.baudrate = 921600#115200
+            ser.baudrate = 115200
             ser.port = w.device
             ser.open()
             while ser.isOpen() == False:
@@ -211,15 +211,14 @@ def read(uid, reg, length, data):
     input = toStr(out)
     uid[0].write(input)
     readback = ''
-    # print(out)
-    # let's wait one second before reading output (let's give device time to answer)
-    #if length < 5:
-        #wait_time = 0.006
-    #else:
-        #wait_time = float(length)*0.001
-    #time.sleep(wait_time)#float(length)*0.001)#15)
+    #Escape after 10 ms
+    t = int(round(time.time() * 1000))
     while uid[0].in_waiting == 0:
-        pass
+        if (int(round(time.time() * 1000)) - t) > 10:
+            return STATUS_ERROR, 0
+        else:
+            pass
+            
 
     while uid[0].inWaiting() > 0:
         readback += uid[0].read(1)
@@ -309,9 +308,15 @@ def write(uid, reg, data):
             pass
 
     readback = ''
+    
+    #Escape after 10 ms
+    t = int(round(time.time() * 1000))
     while uid[0].in_waiting == 0:
-        pass
-
+        if (int(round(time.time() * 1000)) - t) > 10:
+            return STATUS_ERROR, 0
+        else:
+            pass
+            
     status = STATUS_OK
     while uid[0].inWaiting() > 0:
         rc = uid[0].read(1)

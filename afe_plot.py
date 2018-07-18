@@ -12,7 +12,7 @@ ser = ark.enum()[0]
 data=[]
 temp=[]
    
-if (ser.isOpen()):
+if True:#(ser.isOpen()):
        
     #ark.i2c_address(ser, 0x40)
     
