@@ -4,14 +4,9 @@ import serial.tools.list_ports
 import string
 import sys
 
-# Known I2C slave address
-addr_list = [0x26, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47]
-
 STATUS_OK = 0
 STATUS_ERROR = 1
 
-# ARK_PID = 67
-# ARK_VID = 9025
 # convert string to hex
 toHex = lambda x: "".join([hex(ord(c))[2:].zfill(2) for c in x])
 
@@ -137,11 +132,12 @@ def i2c_clock(uid, clock):
 
 def address_check(port): # Scan all possible slave address to find the valid one
     devices = []
-    for addr in addr_list:
+    for addr in range(8,120): #Scan all possible I2C address
         uid = (port, addr)
         status, num_write = write(uid, 0xdd, [0x00])
         if status == STATUS_OK:
             devices.append(uid)
+            print "Device found @ I2C address 0x%x" %addr
     return devices
 
 
@@ -266,13 +262,13 @@ def write(uid, reg, data):
     if len(out) <= 0:
         return STATUS_ERROR
     out += '4C'
-    if len(data) > 16:
+    if len(data) > 32:
         t = 16
     else:
         t = len(data)
     out += '{:02X}'.format(t+1)
 
-    if (len(data)) > 16:
+    if (len(data)) > 32:
         out += '77'
     else:
         out += '57'
@@ -287,7 +283,7 @@ def write(uid, reg, data):
     while uid[0].out_waiting > 0:
         pass
 
-    if len(data) > 16:
+    if len(data) > 32:
         out = i2c_address(uid[1])
         if len(out) <= 0:
             return STATUS_ERROR
