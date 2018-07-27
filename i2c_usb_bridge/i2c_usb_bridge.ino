@@ -7,11 +7,8 @@
  * with the commandline arduino-mk package (apt-get install arduino-mk)
  */
 void handleReceivedData(byte data);
-void escapeSendData(byte data);
 void initAdapter();
 void handleCommand(byte command);
-void escapeSendData(byte data);
-void handleReceivedSequence(byte data);
 void handleData(byte data);
 void handleWireRead();
 void handleDioRead();
@@ -39,6 +36,7 @@ void toggle_LED();
 #define CMD_SET_CLOCK			'C'
 #define CMD_PULLUP_ON        	'P'
 #define CMD_PULLUP_OFF			'p'
+#define CMD_HANDSHAKE       'Z'
 
 #define CMD_DIO_PIN         'D'
 #define CMD_DIO_MODE        'M'
@@ -55,6 +53,8 @@ void toggle_LED();
 #define STATE_DIO_PIN     0x08
 #define STATE_DIO_MODE    0x09
 #define STATE_DIO_WRITE   0x0A
+
+#define STATE_HANDSHAKE   0x10
 
 #define CHAR_RESET		0x1B    // It is somehow misleading that <ESC> is used for RESET
 #define CHAR_ESCAPE		0x5C    // And "\" is the escape character.
@@ -86,11 +86,20 @@ byte length_echo = 0;
 
 byte read_buf[32];
 
+byte time_stamp[6] = { //180726
+  0x31,
+  0x38,
+  0x30,
+  0x37,
+  0x32,
+  0x36
+};
+
 String ident = "Arduino I2C-to-USB 1.0"; 
 
 void setup() {
 	// initialize the serial communication:
-	Serial.begin(115200);//921600);
+	Serial.begin(115200);
 	pinMode(LED_BUILTIN, OUTPUT);
 	Wire.begin();
  
@@ -140,7 +149,7 @@ void loop() {
 		} else {
 			// Every other character gets passed to "handleReceivedData"
 			// which will take care about unescaping.
-			handleReceivedSequence(data);
+			handleData(data);
 		}
 
 		if (state == STATE_ERROR) {
@@ -214,7 +223,7 @@ void handleData(byte data) {
 					return;
 				}
 				
-			toggle_LED();
+			//toggle_LED();
 			
 			if (!restart){
 				//escapeSendData(state);
@@ -257,6 +266,16 @@ void handleData(byte data) {
       digitalWrite(dio_pin, data == 0 ? LOW : HIGH);
     }
     state = STATE_INIT;
+	} else if (state == STATE_HANDSHAKE) {
+    //if (data == CMD_HANDSHAKE) {
+      read_buf[0] = 0x7A; read_buf[1] = 0x7A;
+      for (byte i = 0; i < 6; i++) {
+        read_buf[i+2] = time_stamp[i];
+      }
+      Serial.write(read_buf, 8);
+      Serial.flush();      
+    //}
+    state = STATE_INIT;
 	}
 }
 
@@ -291,19 +310,19 @@ void handleCommand(byte command) {
 			break;
 
 		case CMD_GET_ADDRESS:
-			escapeSendData(address);
+			Serial.write(address);
 			break;
 
 		case CMD_GET_LENGTH:
-			escapeSendData(length);
+			Serial.write(length);
 			break;
 
 		case CMD_GET_STATE:
-			escapeSendData(state);
+			Serial.write(state);
 			break;
 
 		case CMD_GET_ERROR:
-			escapeSendData(error);
+			Serial.write(error);
 			break;
 
 		case CMD_GET_IDENT:
@@ -341,6 +360,10 @@ void handleCommand(byte command) {
     case CMD_DIO_WRITE:
       state = STATE_DIO_WRITE;
       break;
+
+    case CMD_HANDSHAKE:
+      state = STATE_HANDSHAKE;
+      break;
 	}
 }
 
@@ -348,7 +371,7 @@ void handleIdent() {
   	int len = ident.length();
   	char buf[len+1];
   	ident.toCharArray(buf, len+1);
-  	escapeSendData(len);
+  	Serial.write(len);
   	// We can use "Serial.write" here because we know the IDENT string
   	// doesn't contain any characters which would have to get escaped.
   	Serial.write((uint8_t*)buf, len);
@@ -362,7 +385,7 @@ void handleWireRead() {
   	//escapeSendData(CHAR_ESCAPE);
   	//escapeSendData(a);
   	if (a != 0) {
-    	byte r = 0;
+    	//byte r = 0;
     	for (byte i = 0; i < a; i++) {
       		read_buf[i] = Wire.read();
       		//Serial.write(r);//escapeSendData(r);
@@ -388,69 +411,5 @@ void handleDioRead() {
       Serial.flush();
     }
     state = STATE_INIT;
-}
-
-/**
- * This function handles the plain received data bytes.
- * If it receives the <ESC> character it resets the state machine to INIT state.
- * It handles the "\" escape sequence and calls "handleData" for the unescaped
- * data having been received.
- *
- * @param byte data: The received data byte
- * @return void
- */
-void handleReceivedSequence(byte data) {    
-	//if (0){//escape) {
-		/*
-		escape = false;
-		switch (data) {
-			case CHAR_ESCAPED_ESCAPE:  // Will cause a "\" (ESCAPE) to get added to the buffer
-				handleData(CHAR_ESCAPE);
-				break;
-
-			case CHAR_ESCAPED_RESET:  // Will cause a <ESC> (RESET) to get added to the buffer
-				handleData(CHAR_RESET);
-				break;
-
-			default:
-				// Every other character causes an error while being in an escape sequence
-				state = STATE_ERROR;
-				error = ERROR_UNESCAPE;
-				break;
-				*/
-		//}
-	//} else {
-		//if (0){//		  data == CHAR_ESCAPE) {
-		//	escape = true;
-		//} else {
-			handleData(data);
-		//}
-	//}
-}
-
-/**
- * This function sends the passed byte. It escapes special characters.
- *
- * @param byte data: The data byte which should get sent.
- * @return void
- */
-void escapeSendData(byte data) {
-  /*
-  	if (data == CHAR_ESCAPE) {
-
-    	Serial.write(CHAR_ESCAPE);
-    	Serial.write(CHAR_ESCAPED_ESCAPE);
-
-  	} else if (data == CHAR_RESET) {
-
-    	Serial.write(CHAR_ESCAPE);
-    	Serial.write(CHAR_ESCAPED_RESET);
-
-  	} else*/ {
-
-    	Serial.write(data);
-
-  	}
-	//Serial.flush();
 }
 

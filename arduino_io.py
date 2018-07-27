@@ -141,6 +141,37 @@ def address_check(port): # Scan all possible slave address to find the valid one
     return devices
 
 
+def arduino_check(ser): # Send test string and see if target devices acknowledged
+    ser.flushInput()
+    ser.flushOutput()
+    
+    #send out "ZZ"
+    out = ''
+    out += '5A'
+    out += '5A'
+
+    input = toStr(out)
+    ser.write(input)
+    readback = ''
+    #Escape after 10 ms
+    t = int(round(time.time() * 1000))
+    while ser.in_waiting == 0:
+        if (int(round(time.time() * 1000)) - t) > 10:
+            return False
+        else:
+            pass
+            
+    while ser.inWaiting() > 0:
+        readback += ser.read(1)
+
+    if readback != '':
+        if readback[0] == readback[1] == 'z':
+            print "Arduino found, FW v." + readback[2:]
+            return True
+        else:
+            return False
+    
+
 def enum():
     devices = []
     a = serial.tools.list_ports.comports()
@@ -157,6 +188,10 @@ def enum():
 
             #pullup(ser,True)
             #time.sleep(1) # Delay for the line to be pulled up
+            
+            if arduino_check(ser) == False:
+                print "Not Arduino"
+                continue
 
             devices += address_check(ser)
             #print len(devices)
@@ -328,5 +363,5 @@ def close(handle):
     return STATUS_OK
 
 '''test code'''
-#aio = enum()[0]
+#aio = enum()
 #close(aio)
