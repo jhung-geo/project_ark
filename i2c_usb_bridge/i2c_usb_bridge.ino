@@ -125,11 +125,13 @@ void initAdapter() {
 }
 
 void loop() {
+  /*
 	while (!Serial) {
 		// wait for serial port to connect. Needed for Leonardo only
 		// The state will be "INIT" upon connecting the serial.
 		initAdapter();    
 	}
+ */
 
 	if (Serial.available()) {
 	
