@@ -86,13 +86,13 @@ byte length_echo = 0;
 
 byte read_buf[32];
 
-byte time_stamp[6] = { //180726
-  0x31,
-  0x38,
-  0x30,
-  0x37,
-  0x32,
-  0x36
+byte time_stamp[6] = { //180806
+	0x31,
+	0x38,
+	0x30,
+	0x38,
+	0x30,
+	0x36
 };
 
 String ident = "Arduino I2C-to-USB 1.0"; 
@@ -219,11 +219,11 @@ void handleData(byte data) {
 		}
 		if (length == 0) {
 			rv = Wire.endTransmission(restart ? false : true);
-				if (rv != 0) {
-					state = STATE_ERROR;
-					error = ERROR_SENDDATA + 10 + rv;
-					return;
-				}
+			if (rv != 0) {
+				state = STATE_ERROR;
+				error = ERROR_SENDDATA + 10 + rv;
+				return;
+			}
 				
 			//toggle_LED();
 			
@@ -241,43 +241,42 @@ void handleData(byte data) {
 			Wire.setClock(int(i2c_clock*10000));
 		}
 		state = STATE_INIT;
-	} 
-	else if (state == STATE_DIO_PIN) {
-    dio_pin = data;
-    state = STATE_INIT;
+	} else if (state == STATE_DIO_PIN) {
+		dio_pin = data;
+		state = STATE_INIT;
 	} else if (state == STATE_DIO_MODE) {
-    dio_mode = data;
-    if (dio_pin > 1 && dio_pin < 14) {
-      switch (dio_mode) {
-        case 0:
-          pinMode(dio_pin, INPUT);
-          break;
-        case 1:
-          pinMode(dio_pin, OUTPUT);
-          break;
-        case 2:
-          pinMode(dio_pin, INPUT_PULLUP);
-          break;
-        default:
-          break;
-      }
-    }
-    state = STATE_INIT;
+		dio_mode = data;
+		if (dio_pin > 1 && dio_pin < 14) {
+			switch (dio_mode) {
+				case 0:
+				  pinMode(dio_pin, INPUT);
+				  break;
+				case 1:
+				  pinMode(dio_pin, OUTPUT);
+				  break;
+				case 2:
+				  pinMode(dio_pin, INPUT_PULLUP);
+				  break;
+				default:
+				  break;
+			}
+		}
+		state = STATE_INIT;
 	} else if (state == STATE_DIO_WRITE) {
-    if (dio_pin > 1 && dio_pin < 14) {
-      digitalWrite(dio_pin, data == 0 ? LOW : HIGH);
-    }
-    state = STATE_INIT;
+		if (dio_pin > 1 && dio_pin < 14) {
+			digitalWrite(dio_pin, data == 0 ? LOW : HIGH);
+		}
+		state = STATE_INIT;
 	} else if (state == STATE_HANDSHAKE) {
     //if (data == CMD_HANDSHAKE) {
-      read_buf[0] = 0x7A; read_buf[1] = 0x7A;
-      for (byte i = 0; i < 6; i++) {
-        read_buf[i+2] = time_stamp[i];
-      }
-      Serial.write(read_buf, 8);
-      Serial.flush();      
+		read_buf[0] = 0x7A; read_buf[1] = 0x7A;
+		for (byte i = 0; i < 6; i++) {
+			read_buf[i+2] = time_stamp[i];
+		}
+		Serial.write(read_buf, 8);
+		Serial.flush();      
     //}
-    state = STATE_INIT;
+		state = STATE_INIT;
 	}
 }
 
@@ -348,24 +347,24 @@ void handleCommand(byte command) {
 			break;			
 			
 		case CMD_DIO_PIN:
-      state = STATE_DIO_PIN;
-      break;
+			state = STATE_DIO_PIN;
+			break;
 
-    case CMD_DIO_MODE:
-      state = STATE_DIO_MODE;
-      break;
+		case CMD_DIO_MODE:
+			state = STATE_DIO_MODE;
+			break;
 
-    case CMD_DIO_READ:
-      handleDioRead();
-      break;
+		case CMD_DIO_READ:
+			handleDioRead();
+			break;
 
-    case CMD_DIO_WRITE:
-      state = STATE_DIO_WRITE;
-      break;
+		case CMD_DIO_WRITE:
+			state = STATE_DIO_WRITE;
+			break;
 
-    case CMD_HANDSHAKE:
-      state = STATE_HANDSHAKE;
-      break;
+		case CMD_HANDSHAKE:
+			state = STATE_HANDSHAKE;
+			break;
 	}
 }
 
@@ -380,25 +379,33 @@ void handleIdent() {
 }
 
 void handleWireRead() {
-  	Wire.requestFrom((uint8_t)address, (uint8_t)length, (uint8_t)1);//(uint8_t)(restart ? 0 : 1));
-  	restart = false;
-  
-  	byte a = Wire.available();
-  	//escapeSendData(CHAR_ESCAPE);
-  	//escapeSendData(a);
+	byte retry = 0;
+	byte a;
+	
+	while (1) { //Retry 3 times if the I2C read length doesn't match with actual read size
+		Wire.requestFrom((uint8_t)address, (uint8_t)length, (uint8_t)1);
+    	restart = false;
+    
+		a = Wire.available();
+		if (a == length) {
+			break;
+		} else if (retry++ > 3) {
+			state = STATE_ERROR;
+			return;
+		}
+	}
+      
+
   	if (a != 0) {
-    	//byte r = 0;
     	for (byte i = 0; i < a; i++) {
       		read_buf[i] = Wire.read();
-      		//Serial.write(r);//escapeSendData(r);
     	}
 		//toggle_LED();
   	}
-    //for (byte j = 0; j < a; j++) {
-      Serial.write(read_buf, a);
-    //}
-  	Serial.flush();
-  	//escapeSendData(CHAR_RESET);
+    
+    Serial.write(read_buf, a);
+  	Serial.flush();  	
+	
   	if (Wire.available() != 0) {
     	state = STATE_ERROR;
   	} else {
@@ -408,9 +415,9 @@ void handleWireRead() {
 
 void handleDioRead() {
     if (dio_pin > 1 && dio_pin < 14) {
-      byte level = digitalRead(dio_pin);
-      Serial.write(level == LOW ? 0 : 1);
-      Serial.flush();
+		byte level = digitalRead(dio_pin);
+		Serial.write(level == LOW ? 0 : 1);
+		Serial.flush();
     }
     state = STATE_INIT;
 }
