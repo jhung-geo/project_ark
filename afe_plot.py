@@ -25,6 +25,8 @@ if True:#(ser.isOpen()):
     '''Fill the first 100 samples'''
     for i in range(100):
         status, num_read = ark.read(ser, 0x03, 2, temp)
+        if num_read != 2:
+            continue 
         t = ((temp[0] << 8) + (temp[1] & 0xf0))>>4
         data.append(t)
     
@@ -39,6 +41,8 @@ if True:#(ser.isOpen()):
             for i in range(99):
                 data[i] = data[i+1]
             status, num_read = ark.read(ser, 0x03, 2, temp)
+            if num_read != 2:
+                continue
             t = ((temp[0] << 8) + (temp[1] & 0xf0))>>4
             data[99] = t             
             

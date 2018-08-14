@@ -19,7 +19,6 @@ void toggle_LED();
  * Can't access error register of TWI/Wire library. Thus no errors
  * can get recognized for Wire.requestFrom()
  */
-// extern uint8_t twi_error;
 
 
 #define CMD_I2C_ADDRESS			'A'
@@ -86,13 +85,13 @@ byte length_echo = 0;
 
 byte read_buf[32];
 
-byte time_stamp[6] = { //180806
+byte time_stamp[6] = { //180814
 	0x31,
 	0x38,
 	0x30,
 	0x38,
-	0x30,
-	0x36
+	0x31,
+	0x34
 };
 
 String ident = "Arduino I2C-to-USB 1.0"; 
@@ -113,7 +112,7 @@ void setup() {
 
 void initAdapter() {
 	// End an eventually ongoing transmission
-	Wire.endTransmission();
+	//Wire.endTransmission();
   
 	state = STATE_INIT;
 	address = 0;
@@ -125,40 +124,27 @@ void initAdapter() {
 }
 
 void loop() {
-  /*
-	while (!Serial) {
-		// wait for serial port to connect. Needed for Leonardo only
-		// The state will be "INIT" upon connecting the serial.
-		initAdapter();    
-	}
- */
-
 	if (Serial.available()) {
 	
 		if (state == STATE_ERROR) {
 			// Signal the PC an error
-			Serial.write(error);//CHAR_RESET);
+			Serial.write(error);
 			
 			initAdapter(); //Go back to init state after error is reported, JH
+			Wire.endTransmission();
 		}
 
 		// Read data from serial port
 		data = Serial.read();
 
-		if (0){//data == CHAR_RESET) {
-			// When the RESET character has been received cause a reset
-			initAdapter();
-		} else {
-			// Every other character gets passed to "handleReceivedData"
-			// which will take care about unescaping.
-			handleData(data);
-		}
-
+		handleData(data);
+		
 		if (state == STATE_ERROR) {
 			// Signal the PC an error
-			Serial.write(error);//CHAR_RESET);
+			Serial.write(error);
 			
 			initAdapter(); //Go back to init state after error is reported, JH
+			Wire.endTransmission();
 		}
 		
 	}

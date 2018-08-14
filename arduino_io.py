@@ -200,7 +200,9 @@ def enum():
                 #pullup(ser,True)
                 #devices += address_check(ser)
         else:
-            print "Not Arduino"
+            pass#print "Not Arduino"
+    if devices == []:
+        print '\nDevice enumeration failed, please check connection and/or device(s)\n'
     return(devices)
 
 
@@ -242,10 +244,10 @@ def read(uid, reg, length, data):
     input = toStr(out)
     uid[0].write(input)
     readback = ''
-    #Escape after 10 ms
+    #Escape after 100 ms
     t = int(round(time.time() * 1000))
-    while uid[0].in_waiting == 0:
-        if (int(round(time.time() * 1000)) - t) > 10:
+    while uid[0].in_waiting != length:
+        if (int(round(time.time() * 1000)) - t) > 100:
             return STATUS_ERROR, 0
         else:
             pass
