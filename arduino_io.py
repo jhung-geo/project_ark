@@ -142,8 +142,8 @@ def address_check(port): # Scan all possible slave address to find the valid one
 
 
 def arduino_check(ser): # Send test string and see if target devices acknowledged
-    ser.flushInput()
-    ser.flushOutput()
+    #ser.flushInput()
+    #ser.flushOutput()
     
     #send out "ZZ"
     out = ''
@@ -151,15 +151,23 @@ def arduino_check(ser): # Send test string and see if target devices acknowledge
     out += '5A'
 
     input = toStr(out)
-    ser.write(input)
-    readback = ''
-    #Escape after 10 ms
-    t = int(round(time.time() * 1000))
-    while ser.in_waiting == 0:
-        if (int(round(time.time() * 1000)) - t) > 10:
-            return False
+    
+    start_delay = 0    
+    while start_delay < 10:
+        ser.flushInput()
+        ser.flushOutput()        
+        ser.write(input)
+        readback = ''
+        #Escape after 100 ms
+        t = int(round(time.time() * 1000))
+        while ser.in_waiting != 8:
+            if (int(round(time.time() * 1000)) - t) > 100:
+                start_delay += 1
+                break
+            else:
+                pass
         else:
-            pass
+            start_delay = 10
             
     while ser.inWaiting() > 0:
         readback += ser.read(1)
@@ -184,8 +192,8 @@ def enum():
             ser.open()
             while ser.isOpen() == False:
                 pass # print "not yet open"
-            time.sleep(4) # wait 4 second
-
+            #time.sleep(4) # wait 4 second
+            
             #pullup(ser,True)
             #time.sleep(1) # Delay for the line to be pulled up
             
