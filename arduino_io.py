@@ -132,7 +132,10 @@ def i2c_clock(uid, clock):
 
 def address_check(port): # Scan all possible slave address to find the valid one
     devices = []
+    t = int(round(time.time() * 1000))
     for addr in range(8,120): #Scan all possible I2C address
+        if (int(round(time.time() * 1000)) - t) > 500: #if the address scan takes more than 500ms, escape
+            break
         uid = (port, addr)
         status, num_write = write(uid, 0xdd, [0x00])
         if status == STATUS_OK:
@@ -178,6 +181,8 @@ def arduino_check(ser): # Send test string and see if target devices acknowledge
             return True
         else:
             return False
+    else:
+        return False
     
 
 def enum():
