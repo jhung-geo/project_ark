@@ -7,10 +7,6 @@ board (Arduino Replaces aardvarK).  The project contains:
 
 	i2c_usb_bridge\i2c_usb_bridge.ino	Arduino board FW
 
-	chipsea_fw_flash.py					Chipsea firmware flash script that uses
-										the bridge
-
-	afe_plot.py							Sample plot script that reads NextInput AFE
 
 
 To use the scripts and firmware code, you need to have:
@@ -20,8 +16,12 @@ To use the scripts and firmware code, you need to have:
 
 To build and install the module as a python package, run:
 
+	pip install git+https://bitbucket.org/nextinput_sw/project_ark.git
+	
+	or, if there's no Internet connection, run:
+	
 	python setup.py sdist
-	pip install dist/arduino_io-0.0.1.tar.gz
+	pip install dist/arduino_io-[latest_version].tar.gz
 
 Use this package with the following import statement
 
