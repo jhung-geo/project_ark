@@ -18,6 +18,15 @@ To use the scripts and firmware code, you need to have:
 	Python 2.7 with required modules installed (run "pip install -r requirements.txt")
 	Arduino IDE (download here https://www.arduino.cc/en/Main/Software)
 
+To build and install the module as a python package, run:
+
+	python setup.py sdist
+	pip install dist/arduino_io-0.0.1.tar.gz
+
+Use this package with the following import statement
+
+	import arduino_io.arduino_io
+
 The Arduino board is programmed to act as a virtual serial port to host machine.
 User can send and receive data by issuing serial command:
 
