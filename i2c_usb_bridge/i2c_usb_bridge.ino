@@ -103,8 +103,8 @@ void setup() {
 	Wire.begin();
  
 	// Disable internal pullups
-	pinMode(SDA, INPUT);
-	pinMode(SCL, INPUT);
+	//pinMode(SDA, INPUT);
+	//pinMode(SCL, INPUT);
   
 	initAdapter();
 	Wire.setClock(400000);
@@ -407,4 +407,3 @@ void handleDioRead() {
     }
     state = STATE_INIT;
 }
-
