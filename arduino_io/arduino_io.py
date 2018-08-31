@@ -49,7 +49,7 @@ def pullup(serial_port,state):
 	serial_port.flushOutput()
 	foo = toStr(out)
 	try:
-		serial_port.write(str.encode(foo))
+		serial_port.write(foo.encode('iso-8859-1'))
 	except UnicodeDecodeError:
 		serial_port.write(foo)
 	while serial_port.out_waiting > 0:
@@ -68,7 +68,7 @@ def dio_pin(serial_port, pin):
 	serial_port.flushOutput()
 	out = toStr(out)
 	try:
-		serial_port.write(str.encode(out))
+		serial_port.write(out.encode('iso-8859-1'))
 	except UnicodeDecodeError:
 		serial_port.write(out)
 		
@@ -88,7 +88,7 @@ def dio_mode(serial_port, pin, mode):
 	serial_port.flushOutput()
 	out = toStr(out)
 	try:
-		serial_port.write(str.encode(out))
+		serial_port.write(out.encode('iso-8859-1'))
 	except UnicodeDecodeError:
 		serial_port.write(out)
 	
@@ -104,7 +104,7 @@ def dio_read(serial_port, pin):
 	serial_port.flushOutput()
 	out = toStr(out)
 	try:
-		serial_port.write(str.encode(out))
+		serial_port.write(out.encode('iso-8859-1'))
 	except UnicodeDecodeError:
 		serial_port.write(out)
 
@@ -126,7 +126,7 @@ def dio_write(serial_port, pin, level):
 	serial_port.flushOutput()
 	out = toStr(out)
 	try:
-		serial_port.write(str.encode(out))
+		serial_port.write(out.encode('iso-8859-1'))
 	except UnicodeDecodeError:
 		serial_port.write(out)
 	
@@ -147,7 +147,7 @@ def i2c_clock(uid, clock):
 	#print(out)
 	input = toStr(out)
 	try:
-		uid.write(str.encode(input))
+		uid.write(input.encode('iso-8859-1'))
 	except UnicodeDecodeError:
 		uid.write(input)
 
@@ -185,7 +185,7 @@ def arduino_check(ser): # Send test string and see if target devices acknowledge
 		ser.flushInput()
 		ser.flushOutput()
 		try:
-			ser.write(str.encode(input))
+			ser.write(input.encode('iso-8859-1'))
 		except UnicodeDecodeError:
 			ser.write(input)
 		
@@ -286,7 +286,7 @@ def read(uid, reg, length, data):
 
 	input = toStr(out)
 	try:
-		uid[0].write(str.encode(input))
+		uid[0].write(input.encode('iso-8859-1'))
 	except UnicodeDecodeError:
 		uid[0].write(input)
 	readback = []
@@ -366,9 +366,8 @@ def write(uid, reg, data):
 	for i in range(0,t):
 		out += '{:02X}'.format(data[i])
 	input = toStr(out)
-	#print(out)
 	try:
-		uid[0].write(str.encode(input))
+		uid[0].write(input.encode('iso-8859-1'))
 	except UnicodeDecodeError:
 		uid[0].write(input)
 
@@ -387,9 +386,8 @@ def write(uid, reg, data):
 		for i in range(t,len(data)):
 			out += '{:02X}'.format(data[i])
 		input = toStr(out)
-		#print(out)
 		try:
-			uid[0].write(str.encode(input))
+			uid[0].write(input.encode('iso-8859-1'))
 		except UnicodeDecodeError:
 			id[0].write(input)
 		
