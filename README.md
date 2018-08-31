@@ -17,7 +17,7 @@ To build and install the module as a python package, run:
 
 	pip install git+https://bitbucket.org/nextinput_sw/project_ark.git
 	
-	or, if there's no Internet connection, run:
+or, if there's no Internet connection, run:
 	
 	python setup.py sdist
 	pip install dist/arduino_io-[latest_version].tar.gz

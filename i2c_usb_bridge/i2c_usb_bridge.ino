@@ -85,13 +85,13 @@ byte length_echo = 0;
 
 byte read_buf[32];
 
-byte time_stamp[6] = { //180814
+byte time_stamp[6] = { //180831
 	0x31,
 	0x38,
 	0x30,
 	0x38,
-	0x31,
-	0x34
+	0x33,
+	0x31
 };
 
 String ident = "Arduino I2C-to-USB 1.0"; 
@@ -146,7 +146,14 @@ void loop() {
 			initAdapter(); //Go back to init state after error is reported, JH
 			Wire.endTransmission();
 		}
-		
+	} else {
+		if (state == STATE_ERROR) {
+		  // Signal the PC an error
+		  Serial.write(error);
+		  
+		  initAdapter(); //Go back to init state after error is reported, JH
+		  Wire.endTransmission();
+		}
 	}
 }
 
@@ -206,8 +213,10 @@ void handleData(byte data) {
 		if (length == 0) {
 			rv = Wire.endTransmission(restart ? false : true);
 			if (rv != 0) {
-				state = STATE_ERROR;
+				//state = STATE_ERROR;
 				error = ERROR_SENDDATA + 10 + rv;
+				Serial.write(error);     
+				initAdapter(); //Go back to init state after error is reported, JH
 				return;
 			}
 				
