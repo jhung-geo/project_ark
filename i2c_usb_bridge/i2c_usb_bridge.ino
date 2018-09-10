@@ -107,7 +107,7 @@ void setup() {
 	//pinMode(SCL, INPUT);
   
 	initAdapter();
-	Wire.setClock(400000);
+	Wire.setClock(1000000);
 }
 
 void initAdapter() {
