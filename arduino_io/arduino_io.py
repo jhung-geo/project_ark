@@ -224,10 +224,10 @@ def enum():
         try:
             s = serial.Serial(port.device)
             s.baudrate = 115200
-            while s.isOpen() == False:
+            while not s.isOpen():
                 pass
 
-            if arduino_check(s) == False:
+            if not arduino_check(s):
                 print("Not Arduino")
                 continue
 
