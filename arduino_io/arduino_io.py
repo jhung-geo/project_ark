@@ -3,15 +3,17 @@ from __future__ import print_function
 import time
 import serial
 import serial.tools.list_ports
-import string
-import sys
+#import string
+#import sys
 from six.moves import range
 
 STATUS_OK = 0
 STATUS_ERROR = 1
 
 # convert string to hex
-toHex = lambda x: "".join([hex(ord(c))[2:].zfill(2) for c in x])
+#toHex = lambda x: "".join([hex(ord(c))[2:].zfill(2) for c in x])
+def toHex(x):
+    return "".join([hex(ord(c))[2:].zfill(2) for c in x])
 
 
 # convert hex repr to string
@@ -141,7 +143,7 @@ def i2c_clock(uid, clock):
     if clock > 40 or clock < 0:
         print ("I2C clock out of range")
         return
-    num_written = 0
+    #num_written = 0
     uid.flushInput()
     uid.flushOutput()
     out = ''
@@ -228,23 +230,20 @@ def enum():
             ser.baudrate = 115200
             ser.port = w.device
             ser.open()
-            while ser.isOpen() == False:
+            while ser.isOpen() is False:
                 pass # print "not yet open"
             #time.sleep(4) # wait 4 second
 
             #pullup(ser,True)
             #time.sleep(1) # Delay for the line to be pulled up
 
-            if arduino_check(ser) == False:
+            if arduino_check(ser) is False:
                 print ("Not Arduino")
                 continue
 
             devices += address_check(ser)
             #print len(devices)
-            #if len(devices) == 0:
-                #print "pull it up"
-                #pullup(ser,True)
-                #devices += address_check(ser)
+            
         else:
             pass#print "Not Arduino"
     if devices == []:
