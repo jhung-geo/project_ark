@@ -421,10 +421,12 @@ if __name__ == "__main__":
         return val
 
     aio = enum()
-    data = []
+    if len(aio) == 0:
+        exit()
 
-    module = 0
-    preload = 0
+    data = []
+    module = 1
+    preload = 26
     gain = 3
     timeout = 10
 
@@ -447,6 +449,6 @@ if __name__ == "__main__":
         read(aio[module], 3, 4, data)
         raw.append(twos_comp((data[0] << 4) + (data[1] >> 4), 12))
         temp.append(twos_comp((data[2] << 4) + (data[3] >> 4), 12))
-        print(raw[-1], temp[-1])
+        # print(raw[-1], temp[-1])
     print(np.round(np.mean(raw)), np.round(np.mean(temp)))
     close(aio[module][0])
