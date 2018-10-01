@@ -68,6 +68,12 @@ void toggle_LED();
 #define ERROR_WRITEDATA     'W'
 #define ERROR_SENDDATA      'S'
 
+#ifdef ARDUINO_METRO_M4
+#define I2C_CLK_LIMIT 1000000
+#else
+#define I2C_CLK_LIMIT 400000
+#endif
+
 
 byte state = STATE_INIT;
 byte address = 0;
@@ -88,9 +94,9 @@ byte read_buf[32];
 byte time_stamp[6] = { //180831
 	0x31,
 	0x38,
+	0x31,
 	0x30,
-	0x38,
-	0x33,
+	0x30,
 	0x31
 };
 
@@ -101,13 +107,15 @@ void setup() {
 	Serial.begin(115200);
 	pinMode(LED_BUILTIN, OUTPUT);
 	Wire.begin();
- 
+
+#ifdef ARDUINO_AVR_UNO
 	// Disable internal pullups
-	//pinMode(SDA, INPUT);
-	//pinMode(SCL, INPUT);
-  
+	pinMode(SDA, INPUT);
+	pinMode(SCL, INPUT);
+#endif
+
 	initAdapter();
-	Wire.setClock(1000000);
+	Wire.setClock(I2C_CLK_LIMIT);
 }
 
 void initAdapter() {
@@ -177,7 +185,7 @@ void toggle_LED() {
  */
 void handleData(byte data) {
 	byte rv = 0;
-  byte i2c_clock = 0;
+  int i2c_clock = 0;
 	
 	if (state == STATE_INIT) {
 		//Serial.flush();
@@ -231,11 +239,12 @@ void handleData(byte data) {
 			state = STATE_INIT;
 		}
 	} else if (state == STATE_CLOCK) {
-		i2c_clock = data;
-		if (i2c_clock <= 40) {
-			Wire.setClock(int(i2c_clock*10000));
-		}
-		state = STATE_INIT;
+		i2c_clock = int(data*10000);
+		if (i2c_clock > I2C_CLK_LIMIT) i2c_clock = I2C_CLK_LIMIT;
+		Wire.endTransmission();
+		Wire.setClock(i2c_clock);
+		initAdapter();
+		//state = STATE_INIT;
 	} else if (state == STATE_DIO_PIN) {
 		dio_pin = data;
 		state = STATE_INIT;

@@ -140,24 +140,22 @@ def dio_write(serial_port, pin, level):
     return
 
 def i2c_clock(uid, clock):
-    if clock > 40 or clock < 0:
+    if clock > 100 or clock < 0:
         print ("I2C clock out of range")
         return
-    #num_written = 0
-    uid.flushInput()
-    uid.flushOutput()
-    out = ''
-    out += '43'
-    out += str(clock)
-    #print(out)
-    input = toStr(out)
+    uid[0].flushInput()
+    uid[0].flushOutput()
+    out = '43'
+    out += '{:02X}'.format(clock)
+    out = toStr(out)
     try:
-        uid.write(input.encode('iso-8859-1'))
+        uid[0].write(out.encode('iso-8859-1'))
     except UnicodeDecodeError:
-        uid.write(input)
+        uid[0].write(out)
 
-    while uid.out_waiting > 0:
+    while uid[0].out_waiting > 0:
         pass
+    return
 
 def address_check(port): # Scan all possible slave address to find the valid one
     devices = []
@@ -434,6 +432,8 @@ def close(handle):
 # aio = enum()
 # data = []
 
+#i2c_clock(aio[-1],10)
+#time.sleep(0.1)
 # write(aio[-1], 8, [0xF0])
 # time.sleep(0.01)
 # read(aio[-1], 8, 1, data)
@@ -445,7 +445,8 @@ def close(handle):
 # write(aio[-1], 0, [0x8B, 0x35])
 # time.sleep(0.01)
 # print()
-
+#i2c_clock(aio[-1],100)
+#time.sleep(0.1)
 # t = time.time()
 # raw = []
 # temp = []
