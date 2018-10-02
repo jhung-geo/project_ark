@@ -1,11 +1,9 @@
 from __future__ import absolute_import
 from __future__ import print_function
-import time
 import serial
 import serial.tools.list_ports
-#import string
-#import sys
 from six.moves import range
+import time
 
 STATUS_OK = 0
 STATUS_ERROR = 1
@@ -54,8 +52,8 @@ def pullup(serial_port,state):
         serial_port.write(foo.encode('iso-8859-1'))
     except UnicodeDecodeError:
         serial_port.write(foo)
-    while serial_port.out_waiting > 0:
-        pass
+    # while serial_port.out_waiting > 0:
+    #     pass
 
 '''
 GPIO control, still under development
@@ -74,8 +72,8 @@ def dio_pin(serial_port, pin):
     except UnicodeDecodeError:
         serial_port.write(out)
 
-    while serial_port.out_waiting > 0:
-        pass
+    # while serial_port.out_waiting > 0:
+    #     pass
     return STATUS_OK
 
 def dio_mode(serial_port, pin, mode):
@@ -94,8 +92,8 @@ def dio_mode(serial_port, pin, mode):
     except UnicodeDecodeError:
         serial_port.write(out)
 
-    while serial_port.out_waiting > 0:
-        pass
+    # while serial_port.out_waiting > 0:
+    #     pass
 
 
 def dio_read(serial_port, pin):
@@ -135,29 +133,26 @@ def dio_write(serial_port, pin, level):
     except UnicodeDecodeError:
         serial_port.write(out)
 
-    while serial_port.out_waiting > 0:
-        pass
+    # while serial_port.out_waiting > 0:
+    #     pass
     return
 
 def i2c_clock(uid, clock):
-    if clock > 40 or clock < 0:
+    if clock > 100 or clock <= 0:
         print ("I2C clock out of range")
         return
-    #num_written = 0
-    uid.flushInput()
-    uid.flushOutput()
-    out = ''
-    out += '43'
-    out += str(clock)
-    #print(out)
-    input = toStr(out)
+    uid[0].flushInput()
+    uid[0].flushOutput()
+    out = '43'
+    out += '{:02X}'.format(clock)
+    out = toStr(out)
     try:
-        uid.write(input.encode('iso-8859-1'))
+        uid[0].write(out.encode('iso-8859-1'))
     except UnicodeDecodeError:
-        uid.write(input)
+        uid[0].write(out)
 
-    while uid.out_waiting > 0:
-        pass
+    # while uid.out_waiting > 0:
+    #     pass
 
 def address_check(port): # Scan all possible slave address to find the valid one
     devices = []
@@ -221,31 +216,21 @@ def arduino_check(ser): # Send test string and see if target devices acknowledge
 
 def enum():
     devices = []
-    a = serial.tools.list_ports.comports()
-    for w in a:
-        #print(w.device, w.pid, w.vid, w.name)
-        print((w.device, w.pid, w.vid, w.name))
-        if w.pid and w.vid:  # Looking for a COM port with PID and VID
-            ser = serial.Serial()
-            ser.baudrate = 115200
-            ser.port = w.device
-            ser.open()
-            while ser.isOpen() is False:
-                pass # print "not yet open"
-            #time.sleep(4) # wait 4 second
+    ports = serial.tools.list_ports.comports()
+    for port in ports:
+        try:
+            s = serial.Serial(port.device)
+            s.baudrate = 115200
+            while not s.isOpen():
+                pass
 
-            #pullup(ser,True)
-            #time.sleep(1) # Delay for the line to be pulled up
-
-            if arduino_check(ser) is False:
-                print ("Not Arduino")
+            if not arduino_check(s):
+                print("Not Arduino")
                 continue
 
-            devices += address_check(ser)
-            #print len(devices)
-            
-        else:
-            pass#print "Not Arduino"
+            devices += address_check(s)
+        except (OSError, serial.SerialException):
+            pass
     if devices == []:
         print ('\nDevice enumeration failed, please check connection and/or device(s)\n')
     return(devices)
@@ -373,8 +358,8 @@ def write(uid, reg, data):
     except UnicodeDecodeError:
         uid[0].write(input)
 
-    while uid[0].out_waiting > 0:
-        pass
+    # while uid[0].out_waiting > 0:
+    #     pass
 
     if len(data) > 32:
         out = i2c_address(uid[1])
@@ -396,8 +381,8 @@ def write(uid, reg, data):
         # let's wait one second before reading output (let's give device time to answer)
         #time.sleep(float(len(data))*0.0015)
 
-        while uid[0].out_waiting > 0:
-            pass
+        # while uid[0].out_waiting > 0:
+        #     pass
 
     #readback = ''
 
@@ -424,35 +409,47 @@ def close(handle):
     return STATUS_OK
 
 '''test code'''
-# import numpy as np
+if __name__ == "__main__":
+    import numpy as np
 
-# def twos_comp(val, bits):
-#     if (val & (1 << (bits - 1))) != 0:
-#         val -= (1 << bits)
-#     return val
+    def twos_comp(val, bits):
+        if (val & (1 << (bits - 1))) != 0:
+            val -= (1 << bits)
+        return val
 
-# aio = enum()
-# data = []
+    aio = enum()
+    if len(aio) == 0:
+        exit()
 
-# write(aio[-1], 8, [0xF0])
-# time.sleep(0.01)
-# read(aio[-1], 8, 1, data)
-# print(data)
-# write(aio[-1], 11, [0])
-# time.sleep(0.01)
-# read(aio[-1], 11, 1, data)
-# print(data)
-# write(aio[-1], 0, [0x8B, 0x35])
-# time.sleep(0.01)
-# print()
+    data = []
+    module = -1
+    preload = 26
+    gain = 3
+    timeout = 10
 
-# t = time.time()
-# raw = []
-# temp = []
-# while time.time() - t < 5:
-#     read(aio[-1], 3, 4, data)
-#     raw.append(twos_comp((data[0] << 4) + (data[1] >> 4), 12))
-#     temp.append(twos_comp((data[2] << 4) + (data[3] >> 4), 12))
-#     print(raw[-1], temp[-1])
-# print(np.round(np.mean(raw)), np.round(np.mean(temp)))
-# close(aio[-1][0])
+    i2c_clock(aio[-1],10)
+    write(aio[module], 8, [0xF0])
+    time.sleep(0.01)
+    i2c_clock(aio[-1],20)
+    read(aio[module], 8, 1, data)
+    print(data)
+    i2c_clock(aio[-1],30)
+    write(aio[module], 11, [preload << 3])
+    time.sleep(0.01)
+    i2c_clock(aio[-1],100)
+    read(aio[module], 11, 1, data)
+    print(data)
+    write(aio[module], 0, [0x9B, (gain << 4) + 0x05])
+    time.sleep(0.01)
+    print()
+
+    t = time.time()
+    raw = []
+    temp = []
+    while time.time() - t < timeout:
+        read(aio[module], 3, 4, data)
+        raw.append(twos_comp((data[0] << 4) + (data[1] >> 4), 12))
+        temp.append(twos_comp((data[2] << 4) + (data[3] >> 4), 12))
+        # print(raw[-1], temp[-1])
+    print(np.round(np.mean(raw)), np.round(np.mean(temp)))
+    close(aio[module][0])
