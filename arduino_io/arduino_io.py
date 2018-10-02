@@ -138,7 +138,7 @@ def dio_write(serial_port, pin, level):
     return
 
 def i2c_clock(uid, clock):
-    if clock > 100 or clock < 0:
+    if clock > 100 or clock <= 0:
         print ("I2C clock out of range")
         return
     uid[0].flushInput()
