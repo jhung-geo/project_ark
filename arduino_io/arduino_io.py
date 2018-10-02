@@ -221,10 +221,10 @@ def enum():
         try:
             s = serial.Serial(port.device)
             s.baudrate = 115200
-            while s.isOpen() == False:
+            while not s.isOpen():
                 pass
 
-            if arduino_check(s) == False:
+            if not arduino_check(s):
                 print("Not Arduino")
                 continue
 
@@ -422,17 +422,21 @@ if __name__ == "__main__":
         exit()
 
     data = []
-    module = 1
+    module = -1
     preload = 26
     gain = 3
     timeout = 10
 
+    i2c_clock(aio[-1],10)
     write(aio[module], 8, [0xF0])
     time.sleep(0.01)
+    i2c_clock(aio[-1],20)
     read(aio[module], 8, 1, data)
     print(data)
+    i2c_clock(aio[-1],30)
     write(aio[module], 11, [preload << 3])
     time.sleep(0.01)
+    i2c_clock(aio[-1],100)
     read(aio[module], 11, 1, data)
     print(data)
     write(aio[module], 0, [0x9B, (gain << 4) + 0x05])
