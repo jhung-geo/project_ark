@@ -8,237 +8,196 @@ import time
 STATUS_OK = 0
 STATUS_ERROR = 1
 
-# convert string to hex
-#toHex = lambda x: "".join([hex(ord(c))[2:].zfill(2) for c in x])
-def toHex(x):
-    return "".join([hex(ord(c))[2:].zfill(2) for c in x])
+# Convert string to hex
+def str_to_hex(s):
+    return ''.join([hex(ord(c))[2:].zfill(2) for c in s])
 
+# Convert hex to string
+def hex_to_str(x):
+    return x and chr(int(x[:2], base=16)) + hex_to_str(x[2:]) or ''
 
-# convert hex repr to string
-def toStr(s):
-    return s and chr(int(s[:2], base=16)) + toStr(s[2:]) or ''
-
-
-def convert_hex_to_ascii(h):
+# Convert hex to ascii
+def hex_to_ascii(x):
     chars_in_reverse = []
-    while h != 0x0:
-        chars_in_reverse.append(chr(h & 0xFF))
-        h = h >> 8
+    while x != 0:
+        chars_in_reverse.append(chr(x & 0xFF))
+        x = x >> 8
 
     chars_in_reverse.reverse()
     return ''.join(chars_in_reverse)
 
-
-def i2c_address(addr):
-    out = ''
-    if addr <= 0x7f:
-        out += '41'
-        out += '{:02X}'.format(addr)
-    return out
-'''
-I2C Pull-up control, still under development
-'''
-def pullup(serial_port,state):
-    #out = ''
-    #uid = (port, addr)
-    if state:
-        out = '50'
-    else:
-        out = '70'
-    serial_port.flushInput()
-    serial_port.flushOutput()
-    foo = toStr(out)
+# Backwards-compatible serial write
+def serial_write(ser, out, flush=True):
+    if flush:
+        ser.flushInput()
+        ser.flushOutput()
     try:
-        serial_port.write(foo.encode('iso-8859-1'))
+        ser.write(out.encode('iso-8859-1'))
     except UnicodeDecodeError:
-        serial_port.write(foo)
-    # while serial_port.out_waiting > 0:
-    #     pass
-
-'''
-GPIO control, still under development
-'''
-def dio_pin(serial_port, pin):
-    if pin < 2 or pin > 13:
-        print ("Digital IO pin {} out of range".format(pin))
-        return STATUS_ERROR
-    out = '44'
-    out += str(pin)
-    serial_port.flushInput()
-    serial_port.flushOutput()
-    out = toStr(out)
-    try:
-        serial_port.write(out.encode('iso-8859-1'))
-    except UnicodeDecodeError:
-        serial_port.write(out)
-
-    # while serial_port.out_waiting > 0:
-    #     pass
-    return STATUS_OK
-
-def dio_mode(serial_port, pin, mode):
-    if dio_pin(serial_port, pin) != STATUS_OK:
-        return
-    if mode < 0 or mode > 2:
-        print ("Digital IO mode {} out of range".format(mode))
-        return
-    out = '4D'
-    out += str(mode)
-    serial_port.flushInput()
-    serial_port.flushOutput()
-    out = toStr(out)
-    try:
-        serial_port.write(out.encode('iso-8859-1'))
-    except UnicodeDecodeError:
-        serial_port.write(out)
-
-    # while serial_port.out_waiting > 0:
-    #     pass
+        # try:
+        ser.write(out)
+        # except serial.SerialTimeoutException:
+            # pass
+    # except serial.SerialTimeoutException:
+        # pass
 
 
-def dio_read(serial_port, pin):
-    if dio_pin(serial_port, pin) != STATUS_OK:
-        return
-    out = '3C'
-    serial_port.flushInput()
-    serial_port.flushOutput()
-    out = toStr(out)
-    try:
-        serial_port.write(out.encode('iso-8859-1'))
-    except UnicodeDecodeError:
-        serial_port.write(out)
-
-    while serial_port.in_waiting == 0:
-        pass
-    readback = serial_port.read(1)
-    try:
-        return int.from_bytes(readback, byteorder='big')
-    except AttributeError:
-        return int(toHex(str(readback)[0:1]),16)
+def serial_read(ser, length=0, timeout=0.1):
+    readback = []
+    ser.timeout = timeout if timeout > 0 else None
+    readback += ser.read(length).decode()
+    return readback
 
 
-def dio_write(serial_port, pin, level):
-    if dio_pin(serial_port, pin) != STATUS_OK:
-        return
-    if level < 0 or level > 1:
-        print ("Digital IO level {} out of range".format(level))
-        return
-    out = '3E'
-    out += str(level)
-    serial_port.flushInput()
-    serial_port.flushOutput()
-    out = toStr(out)
-    try:
-        serial_port.write(out.encode('iso-8859-1'))
-    except UnicodeDecodeError:
-        serial_port.write(out)
-
-    # while serial_port.out_waiting > 0:
-    #     pass
-    return
-
-def i2c_clock(uid, clock):
-    if clock > 100 or clock <= 0:
-        print ("I2C clock out of range")
-        return
-    uid[0].flushInput()
-    uid[0].flushOutput()
-    out = '43'
-    out += '{:02X}'.format(clock)
-    out = toStr(out)
-    try:
-        uid[0].write(out.encode('iso-8859-1'))
-    except UnicodeDecodeError:
-        uid[0].write(out)
-
-    # while uid.out_waiting > 0:
-    #     pass
-
-def address_check(port): # Scan all possible slave address to find the valid one
-    devices = []
-    t = int(round(time.time() * 1000))
-    for addr in range(8,120): #Scan all possible I2C address
-        if (int(round(time.time() * 1000)) - t) > 500: #if the address scan takes more than 500ms, escape
-            break
-        uid = (port, addr)
-        status, num_write = write(uid, 0xdd, [0x00])
-        if status == STATUS_OK:
-            devices.append(uid)
-            #print ("Device found @ I2C address 0x%x" %addr)
-            print(("Device found @ I2C address 0x%x" %addr))
-    return devices
 
 
-def arduino_check(ser): # Send test string and see if target devices acknowledged
-    #ser.flushInput()
-    #ser.flushOutput()
 
-    #send out "ZZ"
-    out = ''
-    out += '5A'
-    out += '5A'
-
-    input = toStr(out)
+# Attempt to establish handshake with serial device
+def arduino_check(ser):
+    out = hex_to_str('5A5A')
 
     start_delay = 0
     while start_delay < 10:
-        ser.flushInput()
-        ser.flushOutput()
-        try:
-            ser.write(input.encode('iso-8859-1'))
-        except UnicodeDecodeError:
-            ser.write(input)
+        serial_write(ser, out)
 
-        #Escape after 100 ms
-        t = int(round(time.time() * 1000))
-        while ser.in_waiting != 8:
-            if (int(round(time.time() * 1000)) - t) > 100:
-                start_delay += 1
-                break
-            else:
-                pass
+        # Escape after 100 ms
+        readback = serial_read(ser, 8)
+        if len(readback) == 8:
+            break
         else:
-            start_delay = 10
+            start_delay += 1
 
-    readback = []
-    while ser.inWaiting() > 0:
-        readback += ser.read(1).decode()
-
-    if len(readback) != 0:
+    if len(readback) == 8:
         if readback[0] == readback[1] == 'z':
-            print(("Arduino found, FW v." + ''.join(readback[2:])))
+            print('Arduino found at {}, FW v.{}'.format(ser.port, ''.join(readback[2:])))
             return True
-        else:
-            return False
-    else:
-        return False
+    return False
+
+
+# Get the number of I2C buses
+def num_i2c_bus(ser):
+    out = hex_to_str('62')
+    serial_write(ser, out)
+    readback = serial_read(ser, 1)
+    try:
+        return int.from_bytes(readback[0], byteorder='big')
+    except AttributeError:
+        return int(str_to_hex(str(readback[0])[0]),16)
+
+# Select the active I2C bus
+def set_i2c_bus(ser, bus):
+    out = hex_to_str('42{:02X}'.format(bus))
+    serial_write(ser, out)
+
+# Format I2C address
+def i2c_address(addr):
+    return '41{:02X}'.format(addr) if addr <= 0x7F else ''
+
+# Set I2C pullups
+# Still under development
+def pullup(ser, state):
+    out = hex_to_str('50' if state else '70')
+    serial_write(ser, out)
+
+# Target GPIO pin
+def dio_pin(ser, pin):
+    if pin < 2 or pin > 13:
+        print('Digital IO pin {} out of range'.format(pin))
+        return STATUS_ERROR
+    out = hex_to_str('44{:02X}'.format(pin))
+    serial_write(ser, out)
+    return STATUS_OK
+
+# Set GPIO pin mode
+def dio_mode(ser, pin, mode):
+    if dio_pin(ser, pin) != STATUS_OK:
+        return STATUS_ERROR
+    if mode < 0 or mode > 2:
+        print('Digital IO mode {} out of range'.format(mode))
+        return STATUS_ERROR
+    out = hex_to_str('4D{:02X}'.format(mode))
+    serial_write(ser, out)
+    return STATUS_OK
+
+# Read GPIO pin state
+def dio_read(ser, pin):
+    if dio_pin(ser, pin) != STATUS_OK:
+        return STATUS_ERROR
+    out = hex_to_str('3C')
+    serial_write(ser, out)
+    readback = serial_read(ser, 1)
+    try:
+        return int.from_bytes(readback[0], byteorder='big')
+    except AttributeError:
+        return int(str_to_hex(str(readback[0])[0]),16)
+
+# Write GPIO pin state
+def dio_write(ser, pin, level):
+    if dio_pin(ser, pin) != STATUS_OK:
+        return STATUS_ERROR
+    if level < 0 or level > 1:
+        print('Digital IO level {} out of range'.format(level))
+        return STATUS_ERROR
+    out = hex_to_str('3E{:02X}'.format(level))
+    serial_write(ser, out)
+    return STATUS_OK
+
+# Set active I2C bus clock speed
+def i2c_clock(ser, clock):
+    if clock > 100 or clock <= 0:
+        print('I2C clock {} out of range'.format(clock))
+        return STATUS_ERROR
+    out = hex_to_str('43{:02X}'.format(clock))
+    serial_write(ser, out)
+    return STATUS_OK
+
+# Scan all I2C buses for all possible slave addresses
+def address_check(ser):
+    devices = []
+
+    num_bus = num_i2c_bus(ser)
+    print('Found {} I2C bus(es)'.format(num_bus))
+    for b in range(num_bus):
+        # Scan all possible I2C addresses
+        for addr in range(8, 120):
+            uid = (ser, b, addr)
+            status, num_write = write(uid, 0xdd, [0x00])
+            if status == STATUS_OK:
+                devices.append(uid)
+                print('Device found on bus {} @ I2C address 0x{:02X}'.format(b, addr))
+
+    return devices
 
 
 def enum():
     devices = []
     ports = serial.tools.list_ports.comports()
+
     for port in ports:
         try:
-            s = serial.Serial(port.device)
-            s.baudrate = 115200
-            while not s.isOpen():
+            ser = serial.Serial(port.device)
+            ser.baudrate = 115200
+            ser.write_timeout = 0
+            while not ser.isOpen():
                 pass
 
-            if not arduino_check(s):
-                print("Not Arduino")
+            if not arduino_check(ser):
+                print('Not Arduino')
                 continue
 
-            devices += address_check(s)
+            devices += address_check(ser)
         except (OSError, serial.SerialException):
             pass
+
     if devices == []:
-        print ('\nDevice enumeration failed, please check connection and/or device(s)\n')
+        print('\nDevice enumeration failed, please check connection and/or device(s)\n')
+
     return(devices)
 
 
 def read(uid, reg, length, data):
     """
-    Reads data from a target demo device.
+    Reads data from a target device.
 
     First performs a write to the device with the target register
     as the payload before reading back the device data.
@@ -254,41 +213,28 @@ def read(uid, reg, length, data):
         status: Operation status code.
         count:  The number of bytes read from the target.
     """
-    # block cannot exceed 32 bytes
+
+    # Block cannot exceed 32 bytes
     if length > 32:
         return STATUS_ERROR
-    uid[0].flushInput()
-    uid[0].flushOutput()
-    num_read = 0
-    out = i2c_address(uid[1])
-    if len(out) <= 0:
+
+    ser = uid[0]
+    bus = uid[1]
+    addr = uid[2]
+
+    set_i2c_bus(ser, bus)
+
+    out = hex_to_str('{}4C0177{:02X}4C{:02X}52'.format(i2c_address(addr), reg, length))
+    if len(out) < 18:
         return STATUS_ERROR
-    out += '4C'
-    out += '01'
-    out += '77'
-    out += '{:02X}'.format(reg)
-    out += '4C'
-    out += '{:02X}'.format(length)
-    out += '52'
+    serial_write(ser, out)
 
-    input = toStr(out)
-    try:
-        uid[0].write(input.encode('iso-8859-1'))
-    except UnicodeDecodeError:
-        uid[0].write(input)
-    readback = []
-    #Escape after 100 ms
-    t = int(round(time.time() * 1000))
-    while uid[0].in_waiting != length:
-        if (int(round(time.time() * 1000)) - t) > 100:
-            return STATUS_ERROR, 0
-        else:
-            pass
+    readback = serial_read(ser, length)
+    if len(readback) != length:
+        return STATUS_ERROR, len(readback)
 
 
-    while uid[0].inWaiting() > 0:
-        readback += uid[0].read(1)
-
+    # ASDFASDFASDFASDF
     for i in range(len(readback)):
         try:
             readback[i] = chr(readback[i])
@@ -298,14 +244,9 @@ def read(uid, reg, length, data):
     if readback != '':
         del data[:]
         for i in range(len(readback)):
-            #print ">>" + toHex(readback[i:i+1])
-            data.append(int(toHex(readback[i:i+1]),16))
-            i=i+1
+            data.append(int(str_to_hex(readback[i]),16))
 
-    num_read = len(data)
-    status = STATUS_OK
-
-    return status, num_read
+    return STATUS_OK, len(data)
 
 
 def write(uid, reg, data):
@@ -323,89 +264,50 @@ def write(uid, reg, data):
         count:  The number of bytes written to the target.
     """
 
-    #I2C buffer only 32 bytes, including address.  For write data over 31 bytes long send first
-    #16 byte w/ address, then restart the write to send the rest
+    # I2C buffer only 32 bytes, including address.  For write data over 31 bytes long send first
+    # 16 byte w/ address, then restart the write to send the rest
 
-    #print len(data)
-    #if len(data) > 31:
-    ##print "size too big"
-    #return STATUS_ERROR
-    num_written = 0
-    uid[0].flushInput()
-    uid[0].flushOutput()
+    ser = uid[0]
+    bus = uid[1]
+    addr = uid[2]
 
-    out = i2c_address(uid[1])
-    if len(out) <= 0:
-        return STATUS_ERROR
-    out += '4C'
-    if len(data) > 32:
-        t = 16
-    else:
-        t = len(data)
-    out += '{:02X}'.format(t+1)
-
-    if (len(data)) > 32:
-        out += '77'
-    else:
-        out += '57'
-
-    out += '{:02X}'.format(reg)
-    for i in range(0,t):
-        out += '{:02X}'.format(data[i])
-    input = toStr(out)
-    try:
-        uid[0].write(input.encode('iso-8859-1'))
-    except UnicodeDecodeError:
-        uid[0].write(input)
-
-    # while uid[0].out_waiting > 0:
-    #     pass
+    set_i2c_bus(ser, bus)
 
     if len(data) > 32:
-        out = i2c_address(uid[1])
-        if len(out) <= 0:
-            return STATUS_ERROR
-        out += '4C'
-        t = len(data) - t
-        out += '{:02X}'.format(t)
-        out += '57'
+        n = 16
+    else:
+        n = len(data)
+    hex = '{}4C{:02X}{}'.format(i2c_address(addr), n + 1, '77' if len(data) > 32 else '57')
+    out = hex_to_str(hex)
+    serial_write(ser, out)
+    readback = serial_read(ser, 1, None)
 
-        for i in range(t,len(data)):
-            out += '{:02X}'.format(data[i])
-        input = toStr(out)
-        try:
-            uid[0].write(input.encode('iso-8859-1'))
-        except UnicodeDecodeError:
-            id[0].write(input)
+    if len(readback) == 1 and ord(readback[0]) != 5:
+        return STATUS_ERROR, 0
 
-        # let's wait one second before reading output (let's give device time to answer)
-        #time.sleep(float(len(data))*0.0015)
+    hex = '{:02X}'.format(reg)
+    for i in range(n):
+        hex += '{:02X}'.format(data[i])
+    out = hex_to_str(hex)
+    serial_write(ser, out)
 
-        # while uid[0].out_waiting > 0:
-        #     pass
+    if len(data) > 32:
+        hex = '{}4C{:02X}57'.format(i2c_address(addr), len(data) - n)
+        for i in range(n, len(data)):
+            hex += '{:02X}'.format(data[i])
+        out = hex_to_str(hex)
+        serial_write(ser, out, False)
 
-    #readback = ''
-
-    #Escape after 10 ms
-    t = int(round(time.time() * 1000))
-    while uid[0].in_waiting == 0:
-        if (int(round(time.time() * 1000)) - t) > 10:
-            return STATUS_ERROR, 0
-        else:
-            pass
-
-    status = STATUS_OK
-    while uid[0].inWaiting() > 0:
-        rc = uid[0].read(1).decode()
-        if ord(rc) != 5:
-            status = STATUS_ERROR
-
-    num_written = len(data)
-    return status, num_written
+    # Escape after 10 ms
+    readback = serial_read(ser, 1, 0.01)
+    if len(readback) == 1:
+        if ord(readback[0]) == 5:
+            return STATUS_OK, len(data)
+    return STATUS_ERROR, len(data)
 
 
-def close(handle):
-    handle.close()
+def close(ser):
+    ser.close()
     return STATUS_OK
 
 '''test code'''
@@ -423,20 +325,20 @@ if __name__ == "__main__":
 
     data = []
     module = -1
-    preload = 26
+    preload = 16
     gain = 3
     timeout = 10
 
-    i2c_clock(aio[-1],10)
+    i2c_clock(aio[-1][0],10)
     write(aio[module], 8, [0xF0])
     time.sleep(0.01)
-    i2c_clock(aio[-1],20)
+    i2c_clock(aio[-1][0],20)
     read(aio[module], 8, 1, data)
     print(data)
-    i2c_clock(aio[-1],30)
+    i2c_clock(aio[-1][0],30)
     write(aio[module], 11, [preload << 3])
     time.sleep(0.01)
-    i2c_clock(aio[-1],100)
+    i2c_clock(aio[-1][0],100)
     read(aio[module], 11, 1, data)
     print(data)
     write(aio[module], 0, [0x9B, (gain << 4) + 0x05])
