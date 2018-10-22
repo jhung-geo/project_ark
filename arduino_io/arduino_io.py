@@ -34,18 +34,17 @@ def serial_write(ser, out, flush=True):
     try:
         ser.write(out.encode('iso-8859-1'))
     except UnicodeDecodeError:
-        # try:
         ser.write(out)
-        # except serial.SerialTimeoutException:
-            # pass
-    # except serial.SerialTimeoutException:
-        # pass
 
 
 def serial_read(ser, length=0, timeout=0.1):
     readback = []
     ser.timeout = timeout if timeout > 0 else None
-    readback += ser.read(length).decode()
+    r = ser.read(length)
+    try:
+        readback += r.decode()
+    except UnicodeDecodeError:
+        readback += r
     return readback
 
 
@@ -80,9 +79,15 @@ def num_i2c_bus(ser):
     serial_write(ser, out)
     readback = serial_read(ser, 1)
     try:
-        return int.from_bytes(readback[0], byteorder='big')
+        num_bus = int.from_bytes(readback[0], byteorder='big')
     except AttributeError:
-        return int(str_to_hex(str(readback[0])[0]),16)
+        num_bus = int(str_to_hex(str(readback[0])[0]),16)
+    global set_i2c_bus
+    if num_bus == 1:
+        global set_i2c_bus
+        def set_i2c_bus(ser, bus):
+            pass
+    return num_bus
 
 # Select the active I2C bus
 def set_i2c_bus(ser, bus):
@@ -216,7 +221,7 @@ def read(uid, reg, length, data):
 
     # Block cannot exceed 32 bytes
     if length > 32:
-        return STATUS_ERROR
+        return STATUS_ERROR, 0
 
     ser = uid[0]
     bus = uid[1]
@@ -225,12 +230,13 @@ def read(uid, reg, length, data):
     set_i2c_bus(ser, bus)
 
     out = hex_to_str('{}4C0177{:02X}4C{:02X}52'.format(i2c_address(addr), reg, length))
-    if len(out) < 18:
-        return STATUS_ERROR
+    if len(out) < 9:
+        return STATUS_ERROR, 0
     serial_write(ser, out)
 
     readback = serial_read(ser, length)
     if len(readback) != length:
+        print('Received {}, expected {}'.format(len(readback), length))
         return STATUS_ERROR, len(readback)
 
 
@@ -278,14 +284,7 @@ def write(uid, reg, data):
     else:
         n = len(data)
     hex = '{}4C{:02X}{}'.format(i2c_address(addr), n + 1, '77' if len(data) > 32 else '57')
-    out = hex_to_str(hex)
-    serial_write(ser, out)
-    readback = serial_read(ser, 1, None)
-
-    if len(readback) == 1 and ord(readback[0]) != 5:
-        return STATUS_ERROR, 0
-
-    hex = '{:02X}'.format(reg)
+    hex += '{:02X}'.format(reg)
     for i in range(n):
         hex += '{:02X}'.format(data[i])
     out = hex_to_str(hex)

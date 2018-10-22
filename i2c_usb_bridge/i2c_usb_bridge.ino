@@ -84,13 +84,9 @@ void handleDioRead();
 #define ERROR_WRITEDATA         'W'
 #define ERROR_SENDDATA          'S'
 
-#ifdef ARDUINO_METRO_M4
-#define I2C_CLK_LIMIT 1000000
-#else
-#define I2C_CLK_LIMIT 400000
-#endif
+#define I2C_CLK_LIMIT           1000000
 
-#define NUM_I2C_BUS             2
+#define NUM_I2C_BUS             4
 #define SW_WIRE_1_SCL           7
 #define SW_WIRE_1_SDA           6
 #define SW_WIRE_2_SCL           5
@@ -98,22 +94,23 @@ void handleDioRead();
 #define SW_WIRE_3_SCL           3
 #define SW_WIRE_3_SDA           2
 
-uint8_t time_stamp[6] = { // 180831
-  0x31,
-  0x38,
-  0x31,
-  0x30,
-  0x30,
-  0x31
+
+uint8_t time_stamp[6] = {
+  0x30 | /* Y: */ 1,
+  0x30 | /* Y: */ 8,
+  0x30 | /* M: */ 1,
+  0x30 | /* M: */ 0,
+  0x30 | /* D: */ 1,
+  0x30 | /* D: */ 9 
 };
 
 
 String ident = "Arduino I2C-to-USB 1.0";
 
 
-SoftwareWire swWire1(SW_WIRE_1_SDA, SW_WIRE_1_SCL);
-SoftwareWire swWire2(SW_WIRE_2_SDA, SW_WIRE_2_SCL);
-SoftwareWire swWire3(SW_WIRE_3_SDA, SW_WIRE_3_SCL);
+SoftwareWire swWire1(SW_WIRE_1_SDA, SW_WIRE_1_SCL, true, false);
+SoftwareWire swWire2(SW_WIRE_2_SDA, SW_WIRE_2_SCL, true, false);
+SoftwareWire swWire3(SW_WIRE_3_SDA, SW_WIRE_3_SCL, true, false);
 
 TwoWire **wires;
 
@@ -150,7 +147,7 @@ uint8_t state = STATE_INIT;
 uint8_t address = 0;
 uint8_t length = 0;
 uint8_t error = 0;
-bool restart = false;
+uint8_t stop = 1;
 uint8_t read_buf[32];
 
 
@@ -180,19 +177,17 @@ void setup() {
 
   // Configure I2C buses
   for (uint8_t b = 0; b < NUM_I2C_BUS; b++) {
+    // Don't ask how: ensures hardware I2C lines (SCL, SDA) are 
+    // low when disconnected (floating); might as well do it on
+    // software I2C lines as well.
     pinMode(wiresSCL[b], INPUT_PULLUP);
     pinMode(wiresSDA[b], INPUT_PULLUP);
+    
     wires[b]->begin();
     wires[b]->setClock(I2C_CLK_LIMIT);
   }
-  
-#ifdef ARDUINO_AVR_UNO
-	// Disable internal pullups
-	pinMode(SDA, INPUT);
-	pinMode(SCL, INPUT);
-#endif
 
-  // Initialize state machine
+  // Reset state machine
   resetAdapter();
 }
 
@@ -201,7 +196,7 @@ void resetAdapter() {
   address = 0;
   length = 0;
   error = ERROR_NONE;
-  restart = false;
+  stop = 1;
 }
 
 void loop() {
@@ -305,19 +300,25 @@ void handleData(uint8_t data) {
       }
 
       if (length == 0) {
-        uint8_t status = wires[activeWire]->endTransmission(!restart);
+        // If the hardware I2C bus (SCL, SDA) has been flagged as disconnected 
+        // (floating), skip the endTransmission (for some reason it takes F O R E V E R) 
+        // and just throw an error
+        uint8_t status = 4;
+        if (error != ERROR_SENDDATA) {
+          status = wires[activeWire]->endTransmission(stop);
+        }
         if (status != 0) {
           error = ERROR_SENDDATA + 10 + status;
           handleError();
           return;
         }
 
-        if (!restart) {
+        if (stop) {
           Serial.write(state);
           Serial.flush();
         }
 
-        restart = false;
+        stop = 1;
         state = STATE_INIT;
       }
       break;
@@ -416,20 +417,23 @@ void handleCommand(uint8_t cmd) {
       break;
 
     case CMD_I2C_WRITE_RESTART:
-      restart = true;
+      stop = 0;
     case CMD_I2C_WRITE:
+      // Flag a disconnected (floating) hardware I2C bus (SCL, SDA) 
+      // by checking if both lines are LOW; don't even bother trying
+      // to begin a transmission
+      // Disconnected software I2C buses will not trip this check, 
+      // but that's okay
       if (digitalRead(wiresSCL[activeWire]) == LOW && digitalRead(wiresSDA[activeWire]) == LOW) {
         error = ERROR_SENDDATA;
-        handleError();
       } else {
         wires[activeWire]->beginTransmission(address);
-        state = STATE_WRITE;
-        Serial.write(state);
       }
+      state = STATE_WRITE;
       break;
 
     case CMD_I2C_READ_RESTART:
-      restart = true;
+      stop = 0;
     case CMD_I2C_READ:
       handleWireRead();
       break;
@@ -484,15 +488,19 @@ void handleWireRead() {
 
   // Retry a maximum of 3 times until the number of received bytes matches the requested length
   while (1) {
-    wires[activeWire]->requestFrom(address, length, !restart);
+    if (activeWire > 0) {
+      ((SoftwareWire *)wires[activeWire])->requestFrom(address, length, stop);
+    } else {
+      wires[activeWire]->requestFrom(address, length, stop);
+    }
 
     a = wires[activeWire]->available();
     if (a == length) {
-      restart = false;
+      stop = 1;
       break;
     } else if (retry++ > 3) {
       state = STATE_ERROR;
-      restart = false;
+      stop = 1;
       return;
     }
   }
