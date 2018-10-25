@@ -68,7 +68,12 @@ def arduino_check(ser):
 
     if len(readback) == 8:
         if readback[0] == readback[1] == 'z':
-            print('Arduino found at {}, FW v.{}'.format(ser.port, ''.join(readback[2:])))
+            version = ''.join(readback[2:])
+            print('Arduino found at {}, FW v.{}'.format(ser.port, version))
+            if version < 181025:
+                global neopixel_color
+                def neopixel_color(ser, r, g, b):
+                    return STATUS_ERROR
             return True
     return False
 
@@ -78,21 +83,23 @@ def num_i2c_bus(ser):
     out = hex_to_str('62')
     serial_write(ser, out)
     readback = serial_read(ser, 1)
-    try:
-        num_bus = int.from_bytes(readback[0], byteorder='big')
-    except AttributeError:
-        num_bus = int(str_to_hex(str(readback[0])[0]),16)
-    global set_i2c_bus
+    num_bus = 1
+    if len(readback) > 0:
+        try:
+            num_bus = int.from_bytes(readback[0], byteorder='big')
+        except AttributeError:
+            num_bus = int(str_to_hex(str(readback[0])[0]),16)
     if num_bus == 1:
         global set_i2c_bus
         def set_i2c_bus(ser, bus):
-            pass
+            return STATUS_ERROR
     return num_bus
 
 # Select the active I2C bus
 def set_i2c_bus(ser, bus):
     out = hex_to_str('42{:02X}'.format(bus))
     serial_write(ser, out)
+    return STATUS_OK
 
 # Format I2C address
 def i2c_address(addr):

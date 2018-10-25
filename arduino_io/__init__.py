@@ -1,1 +1,1 @@
-from .arduino_io import enum,read,write,close,dio_mode,dio_pin,dio_read,dio_write,neopixel_color
+from .arduino_io import enum, read, write, close, dio_mode, dio_read, dio_write, neopixel_color, i2c_clock

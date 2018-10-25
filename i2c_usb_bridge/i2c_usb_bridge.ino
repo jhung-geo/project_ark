@@ -9,7 +9,6 @@
  * with the commandline arduino-mk package (apt-get install arduino-mk)
  */
 void resetAdapter();
-void handleData(uint8_t data);
 void handleCommand(uint8_t cmd);
 void handleError();
 void handleIdent();
@@ -81,11 +80,15 @@ void handleDioRead();
 #define CHAR_ESCAPED_ESCAPE     0xC5
 
 #define ERROR_NONE              'N'
-#define ERROR_UNESCAPE          'U'
+#define ERROR_CMD               'C'
+#define ERROR_DATA              'D'
+#define ERROR_BUS               'B'
 #define ERROR_LENGTH            'L'
 #define ERROR_READ              'R'
 #define ERROR_WRITEDATA         'W'
 #define ERROR_SENDDATA          'S'
+#define ERROR_DIO               'G'
+#define ERROR_UNESCAPE          'U'
 
 #define I2C_CLK_LIMIT           1000000
 
@@ -106,8 +109,8 @@ uint8_t time_stamp[6] = {
   0x30 | /* Y: */ 8,
   0x30 | /* M: */ 1,
   0x30 | /* M: */ 0,
-  0x30 | /* D: */ 1,
-  0x30 | /* D: */ 9 
+  0x30 | /* D: */ 2,
+  0x30 | /* D: */ 5
 };
 
 
@@ -124,35 +127,23 @@ uint8_t activeWire = 0;
 
 uint8_t wiresSCL[NUM_I2C_BUS] = {
   SCL,
-#if NUM_I2C_BUS > 1
   SW_WIRE_1_SCL,
-#endif
-#if NUM_I2C_BUS > 2
   SW_WIRE_2_SCL,
-#endif
-#if NUM_I2C_BUS > 3
   SW_WIRE_3_SCL,
-#endif
 };
 
 uint8_t wiresSDA[NUM_I2C_BUS] = {
   SDA,
-#if NUM_I2C_BUS > 1
   SW_WIRE_1_SDA,
-#endif
-#if NUM_I2C_BUS > 2
   SW_WIRE_2_SDA,
-#endif
-#if NUM_I2C_BUS > 3
   SW_WIRE_3_SDA,
-#endif
 };
 
 
 uint8_t state = STATE_INIT;
 uint8_t address = 0;
 uint8_t length = 0;
-uint8_t error = 0;
+uint8_t error = ERROR_NONE;
 uint8_t stop = 1;
 uint8_t read_buf[32];
 
@@ -176,15 +167,9 @@ void setup() {
   // Initialize I2C buses
   wires = new TwoWire*[NUM_I2C_BUS];
   wires[0] = &Wire;
-#if NUM_I2C_BUS > 1
   wires[1] = &swWire1;
-#endif
-#if NUM_I2C_BUS > 2
   wires[2] = &swWire2;
-#endif
-#if NUM_I2C_BUS > 3
   wires[3] = &swWire3;
-#endif
 
   // Configure I2C buses
   for (uint8_t b = 0; b < NUM_I2C_BUS; b++) {
@@ -217,9 +202,9 @@ void loop() {
     }
 
     // Read and handle data from serial port
-    char data = Serial.read();
-    if (data >= 0) {
-      handleData(data);
+    char cmd = Serial.read();
+    if (cmd >= 0) {
+      handleCommand(cmd);
     }
 
     if (state == STATE_ERROR) {
@@ -233,144 +218,6 @@ void loop() {
 }
 
 /**
- * This function handles a passed data byte according to the current state
- *
- * @param uint8_t data: The received data byte
- * @return void;
- */
-void handleData(uint8_t data) {
-  switch (state) {
-
-    case STATE_INIT:
-      // The first received byte designates the command
-      handleCommand(data);
-      break;
-
-    case STATE_HANDSHAKE:
-      // In state HANDSHAKE, the host must repeat the HANDSHAKE command
-      // for the handshake to occur
-      if (data == CMD_HANDSHAKE) {
-        read_buf[0] = 0x7A;
-        read_buf[1] = 0x7A;
-        for (uint8_t i = 0; i < 6; i++) {
-          read_buf[i + 2] = time_stamp[i];
-        }
-        Serial.write(read_buf, 8);
-        Serial.flush();
-      }
-      state = STATE_INIT;
-      break;
-
-    case STATE_BUS:
-      // In state BUS, the passed byte denotes the I2C bus to activate
-      data = data > (NUM_I2C_BUS - 1) ? (NUM_I2C_BUS - 1) : data;
-      if (activeWire != data) {
-        activeWire = data;
-        resetAdapter();
-      }
-      state = STATE_INIT;
-      break;
-
-    case STATE_CLOCK:
-      // In the CLOCK state, the passed byte indicates the desired I2C
-      // clock speed (in 10kHz)
-      wires[activeWire]->endTransmission();
-      wires[activeWire]->setClock((data * 10000) > I2C_CLK_LIMIT ? I2C_CLK_LIMIT : (data * 10000));
-      resetAdapter();
-      break;
-
-    case STATE_ADDRESS:
-      // In state ADDRESS, the passed byte denotes the address upon
-      // which further commands will act
-      address = data;
-      state = STATE_INIT;
-      break;
-
-    case STATE_LENGTH:
-      // In state LENGTH, the passed byte defines the number of bytes
-      // to read or write
-      if (data > 32) {
-        state = STATE_ERROR;
-        error = ERROR_LENGTH;
-      } else {
-        length = data;
-        state = STATE_INIT;
-      }
-      break;
-
-    case STATE_WRITE:
-      // In the WRITE state, accept as many data bytes as specified by a
-      // previous LENGTH command, writing them to the target slave address
-      if (length) {
-        if (wires[activeWire]->write(data) == 0) {
-          error = ERROR_WRITEDATA;
-          handleError();
-          return;
-        }
-        length--;
-      }
-
-      if (length == 0) {
-        // If the hardware I2C bus (SCL, SDA) has been flagged as disconnected 
-        // (floating), skip the endTransmission (for some reason it takes F O R E V E R) 
-        // and just throw an error
-        uint8_t status = 4;
-        if (error != ERROR_SENDDATA) {
-          status = wires[activeWire]->endTransmission(stop);
-        }
-        if (status != 0) {
-          error = ERROR_SENDDATA + 10 + status;
-          handleError();
-          return;
-        }
-
-        if (stop) {
-          Serial.write(state);
-          Serial.flush();
-        }
-
-        stop = 1;
-        state = STATE_INIT;
-      }
-      break;
-
-    case STATE_DIO_PIN:
-      // In the DIO_PIN state, the passed byte indicates the pin to operate on
-      dio_pin = data;
-      state = STATE_INIT;
-      break;
-
-    case STATE_DIO_MODE:
-      // In the DIO_MODE state, the passed byte sets the active pin mode
-      dio_mode = data;
-      if (dio_pin > 1 && dio_pin < 14) {
-        switch (dio_mode) {
-          case 0:
-            pinMode(dio_pin, INPUT);
-            break;
-          case 1:
-            pinMode(dio_pin, OUTPUT);
-            break;
-          case 2:
-            pinMode(dio_pin, INPUT_PULLUP);
-            break;
-        }
-      }
-      state = STATE_INIT;
-      break;
-
-    case STATE_DIO_WRITE:
-      // In the DIO_WRITE state, the passed byte represents the pin logic level
-      if (dio_pin > 1 && dio_pin < 14) {
-        digitalWrite(dio_pin, data == 0 ? LOW : HIGH);
-      }
-      state = STATE_INIT;
-      break;
-
-  }
-}
-
-/**
  * This function handles a passed command
  *
  * @param uint8_t command: The command which should get handled
@@ -380,7 +227,25 @@ void handleCommand(uint8_t cmd) {
 	switch (cmd) {
 
     case CMD_HANDSHAKE:
-      state = STATE_HANDSHAKE;
+      // In state HANDSHAKE, the host must repeat the HANDSHAKE command
+      // for the handshake to occur
+      if (Serial.readBytes((char *)read_buf, 1) > 0) {
+        if (read_buf[0] == CMD_HANDSHAKE) {
+          read_buf[0] = 0x7A;
+          read_buf[1] = 0x7A;
+          for (uint8_t i = 0; i < 6; i++) {
+            read_buf[i + 2] = time_stamp[i];
+          }
+          Serial.write(read_buf, 8);
+          Serial.flush();
+        } else {
+          state = STATE_ERROR;
+          error = ERROR_CMD;
+        }
+      } else {
+        state = STATE_ERROR;
+        error = ERROR_DATA;
+      }
       break;
 
     case CMD_GET_ERROR:
@@ -400,11 +265,34 @@ void handleCommand(uint8_t cmd) {
       break;
 
     case CMD_I2C_BUS:
-      state = STATE_BUS;
+      // In state BUS, the passed byte denotes the I2C bus to activate
+      if (Serial.readBytes((char *)read_buf, 1) > 0) {
+        if (read_buf[0] < NUM_I2C_BUS) {
+          if (activeWire != read_buf[0]) {
+            activeWire = read_buf[0];
+            resetAdapter();
+          }
+        } else {
+          state = STATE_ERROR;
+          error = ERROR_BUS;
+        }
+      } else {
+        state = STATE_ERROR;
+        error = ERROR_DATA;
+      }
       break;
 
     case CMD_SET_CLOCK:
-      state = STATE_CLOCK;
+      // In the CLOCK state, the passed byte indicates the desired I2C
+      // clock speed (in 10kHz)
+      if (Serial.readBytes((char *)read_buf, 1) > 0) {
+        wires[activeWire]->endTransmission();
+        wires[activeWire]->setClock(min(read_buf[0] * 10000, I2C_CLK_LIMIT));
+        resetAdapter();
+      } else {
+        state = STATE_ERROR;
+        error = ERROR_DATA;
+      }
       break;
 
     case CMD_PULLUP_ON:
@@ -420,11 +308,30 @@ void handleCommand(uint8_t cmd) {
       break;
 
     case CMD_I2C_ADDRESS:
-      state = STATE_ADDRESS;
+      // In state ADDRESS, the passed byte denotes the address upon
+      // which further commands will act
+      if (Serial.readBytes((char *)read_buf, 1) > 0) {
+        address = read_buf[0];
+      } else {
+        state = STATE_ERROR;
+        error = ERROR_DATA;
+      }
       break;
 
     case CMD_I2C_LENGTH:
-      state = STATE_LENGTH;
+      // In state LENGTH, the passed byte defines the number of bytes
+      // to read or write
+      if (Serial.readBytes((char *)read_buf, 1) > 0) {
+        if (read_buf[0] > 32) {
+          state = STATE_ERROR;
+          error = ERROR_LENGTH;
+        } else {
+          length = read_buf[0];
+        }
+      } else {
+        state = STATE_ERROR;
+        error = ERROR_DATA;
+      }
       break;
 
     case CMD_I2C_WRITE_RESTART:
@@ -440,7 +347,42 @@ void handleCommand(uint8_t cmd) {
       } else {
         wires[activeWire]->beginTransmission(address);
       }
-      state = STATE_WRITE;
+  
+      // In the WRITE state, accept as many data bytes as specified by a
+      // previous LENGTH command, writing them to the target slave address
+      if (Serial.readBytes((char *)read_buf, length) == length) {
+        
+        for (uint8_t i = 0; i < length; i++) {
+          if (wires[activeWire]->write(read_buf[i]) == 0) {
+            state = STATE_ERROR;
+            error = ERROR_WRITEDATA;
+            return;
+          }
+        }
+
+        // If the hardware I2C bus (SCL, SDA) has been flagged as disconnected 
+        // (floating), skip the endTransmission (for some reason it takes F O R E V E R) 
+        // and just throw an error
+        uint8_t status = 4;
+        if (error != ERROR_SENDDATA) {
+          status = wires[activeWire]->endTransmission(stop);
+        }
+        if (status != 0) {
+          state = STATE_ERROR;
+          error = ERROR_SENDDATA + 10 + status;
+          return;
+        }
+
+        if (stop) {
+          Serial.write(STATE_WRITE);
+          Serial.flush();
+        }
+
+        stop = 1;
+      } else {
+        state = STATE_ERROR;
+        error = ERROR_DATA;
+      }
       break;
 
     case CMD_I2C_READ_RESTART:
@@ -458,11 +400,46 @@ void handleCommand(uint8_t cmd) {
       break;
       
     case CMD_DIO_PIN:
-      state = STATE_DIO_PIN;
+      // In the DIO_PIN state, the passed byte indicates the pin to operate on
+      if (Serial.readBytes((char *)read_buf, 1) > 0) {
+        if (read_buf[0] > 1 && read_buf[0] < 14) {
+          dio_pin = read_buf[0];
+        } else {
+          state = STATE_ERROR;
+          error = ERROR_DIO;
+        }
+      } else {
+        state = STATE_ERROR;
+        error = ERROR_DATA;
+      }
       break;
 
     case CMD_DIO_MODE:
-      state = STATE_DIO_MODE;
+      // In the DIO_MODE state, the passed byte sets the active pin mode
+      if (Serial.readBytes((char *)read_buf, 1) > 0) {
+        dio_mode = read_buf[0];
+        switch (dio_mode) {
+          case 0:
+            pinMode(dio_pin, INPUT);
+            break;
+            
+          case 1:
+            pinMode(dio_pin, OUTPUT);
+            break;
+            
+          case 2:
+            pinMode(dio_pin, INPUT_PULLUP);
+            break;
+
+          default:
+            state = STATE_ERROR;
+            error = ERROR_DIO;
+            break;
+        }
+      } else {
+        state = STATE_ERROR;
+        error = ERROR_DATA;
+      }
       break;
 
     case CMD_DIO_READ:
@@ -470,7 +447,13 @@ void handleCommand(uint8_t cmd) {
       break;
 
     case CMD_DIO_WRITE:
-      state = STATE_DIO_WRITE;
+      // In the DIO_WRITE state, the passed byte represents the pin logic level
+      if (Serial.readBytes((char *)read_buf, 1) > 0) {
+        digitalWrite(dio_pin, read_buf[0] == 0 ? LOW : HIGH);
+      } else {
+        state = STATE_ERROR;
+        error = ERROR_DATA;
+      }
       break;
 
     case CMD_NP_COLOR:
@@ -480,6 +463,11 @@ void handleCommand(uint8_t cmd) {
       np.show();
       break;
 
+    default:
+      // Command not recognized
+      state = STATE_ERROR;
+      error = ERROR_CMD;
+      break;
   }
 }
 
