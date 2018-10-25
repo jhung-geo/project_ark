@@ -147,6 +147,13 @@ def dio_write(ser, pin, level):
     serial_write(ser, out)
     return STATUS_OK
 
+def neopixel_color(ser, r, g, b):
+    if r < 0 or r > 255 or g < 0 or g > 255 or b < 0 or b > 255:
+        return STATUS_ERROR
+    out = hex_to_str('58{:02X}{:02X}{:02X}'.format(r, g, b))
+    serial_write(ser, out)
+    return STATUS_OK
+
 # Set active I2C bus clock speed
 def i2c_clock(ser, clock):
     if clock > 100 or clock <= 0:

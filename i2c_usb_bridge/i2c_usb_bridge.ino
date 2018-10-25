@@ -2,6 +2,7 @@
 
 #include <Wire.h>
 #include <SoftwareWire.h>
+#include <Adafruit_NeoPixel.h>
 
 /**
  * These function signatures are necessary so the file can get compiled
@@ -54,6 +55,8 @@ void handleDioRead();
 #define CMD_DIO_READ            '<'
 #define CMD_DIO_WRITE           '>'
 
+// NeoPixel operation
+#define CMD_NP_COLOR            'X'
 
 
 #define STATE_HANDSHAKE         0x10
@@ -93,6 +96,9 @@ void handleDioRead();
 #define SW_WIRE_2_SDA           4
 #define SW_WIRE_3_SCL           3
 #define SW_WIRE_3_SDA           2
+
+#define NUM_NEOPIXEL            1
+#define PIN_NEOPIXEL            40
 
 
 uint8_t time_stamp[6] = {
@@ -154,10 +160,15 @@ uint8_t read_buf[32];
 uint8_t dio_pin = 0;
 uint8_t dio_mode = 3;
 
+Adafruit_NeoPixel np = Adafruit_NeoPixel(NUM_NEOPIXEL, PIN_NEOPIXEL);
 
 void setup() {
   // Initialize LED
   pinMode(LED_BUILTIN, OUTPUT);
+  
+  // Initialize NeoPixel
+  np.begin();
+  np.show();
   
   // Initialize the serial communication
   Serial.begin(115200);
@@ -355,7 +366,7 @@ void handleData(uint8_t data) {
       }
       state = STATE_INIT;
       break;
-      
+
   }
 }
 
@@ -460,6 +471,13 @@ void handleCommand(uint8_t cmd) {
 
     case CMD_DIO_WRITE:
       state = STATE_DIO_WRITE;
+      break;
+
+    case CMD_NP_COLOR:
+      // In the NP_COLOR state, accept 3 bytes representing R, G, and B values
+      Serial.readBytes((char *)read_buf, 3);
+      np.setPixelColor(0, read_buf[0], read_buf[1], read_buf[2]);
+      np.show();
       break;
 
   }
