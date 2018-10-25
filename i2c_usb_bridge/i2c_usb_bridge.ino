@@ -173,9 +173,8 @@ void setup() {
 
   // Configure I2C buses
   for (uint8_t b = 0; b < NUM_I2C_BUS; b++) {
-    // Don't ask how: ensures hardware I2C lines (SCL, SDA) are 
-    // low when disconnected (floating); might as well do it on
-    // software I2C lines as well.
+    // Ensures software I2C lines [2, 7] are high when disconnected (floating), and 
+    // hardware I2C lines (SCL, SDA) are low when disconnected (floating) (don't ask how)
     pinMode(wiresSCL[b], INPUT_PULLUP);
     pinMode(wiresSDA[b], INPUT_PULLUP);
     
@@ -338,10 +337,10 @@ void handleCommand(uint8_t cmd) {
       stop = 0;
     case CMD_I2C_WRITE:
       // Flag a disconnected (floating) hardware I2C bus (SCL, SDA) 
-      // by checking if both lines are LOW; don't even bother trying
+      // by checking if both lines are LOW; if so, don't even bother trying
       // to begin a transmission
-      // Disconnected software I2C buses will not trip this check, 
-      // but that's okay
+      // Disconnected (floating) software I2C buses will not trip this check, 
+      // but that's okay, we'll catch them later
       if (digitalRead(wiresSCL[activeWire]) == LOW && digitalRead(wiresSDA[activeWire]) == LOW) {
         error = ERROR_SENDDATA;
       } else {
@@ -363,6 +362,7 @@ void handleCommand(uint8_t cmd) {
         // If the hardware I2C bus (SCL, SDA) has been flagged as disconnected 
         // (floating), skip the endTransmission (for some reason it takes F O R E V E R) 
         // and just throw an error
+        // Calling endTransmission on a disconnected (floating) software I2C bus is fine
         uint8_t status = 4;
         if (error != ERROR_SENDDATA) {
           status = wires[activeWire]->endTransmission(stop);
@@ -494,11 +494,7 @@ void handleWireRead() {
 
   // Retry a maximum of 3 times until the number of received bytes matches the requested length
   while (1) {
-    if (activeWire > 0) {
-      ((SoftwareWire *)wires[activeWire])->requestFrom(address, length, stop);
-    } else {
-      wires[activeWire]->requestFrom(address, length, stop);
-    }
+    wires[activeWire]->requestFrom(address, length, stop);
 
     a = wires[activeWire]->available();
     if (a == length) {
