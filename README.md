@@ -14,7 +14,7 @@ To use the scripts and firmware code, you need to have:
 
     Python 2.7 with required modules installed (run "pip install -r requirements.txt")
     Arduino IDE (download here https://www.arduino.cc/en/Main/Software)
-    The SoftwareWire and modified Wire libraries (available in the arduino_wire repository)
+    The Arduino modifications available in the arduino_wire repository installed
 
 To build and install the module as a python package, run:
 
@@ -39,13 +39,16 @@ For example, to read 3 bytes from device 0x26, register 0x9d:
 
     "A 26 a 9d l 03 r"
 
-In addition to the hardware I2C bus (SCL/SDA), an additional three I2C buses are available as:
+In addition to the main hardware I2C bus (SCL/SDA), an additional two hardware I2C buses are available as:
 
     Bus     SCL     SDA
     -------------------
-    1       7       6
-    2       5       4
-    3       3       2
+    1       A5      A4
+    2       SCK     MOSI
+
+To enable these additional hardware I2C buses, you must select the board
+
+    Adafruit Metro M4 NI =^._.^= ∫ (SAMD51)
 
 You can also control the Arduino digital GPIOs with the following commands:
 

@@ -92,7 +92,7 @@ void handleDioRead();
 
 #define I2C_CLK_LIMIT           1000000
 
-#define NUM_I2C_BUS             4
+#define NUM_I2C_BUS             3
 #define SW_WIRE_1_SCL           7
 #define SW_WIRE_1_SDA           6
 #define SW_WIRE_2_SCL           5
@@ -126,17 +126,15 @@ TwoWire **wires;
 uint8_t activeWire = 0;
 
 uint8_t wiresSCL[NUM_I2C_BUS] = {
-  SCL,
-  SW_WIRE_1_SCL,
-  SW_WIRE_2_SCL,
-  SW_WIRE_3_SCL,
+  PIN_WIRE_SCL,
+  PIN_WIRE1_SCL,
+  PIN_WIRE2_SCL,
 };
 
 uint8_t wiresSDA[NUM_I2C_BUS] = {
-  SDA,
-  SW_WIRE_1_SDA,
-  SW_WIRE_2_SDA,
-  SW_WIRE_3_SDA,
+  PIN_WIRE_SDA,
+  PIN_WIRE1_SDA,
+  PIN_WIRE2_SDA,
 };
 
 
@@ -167,9 +165,8 @@ void setup() {
   // Initialize I2C buses
   wires = new TwoWire*[NUM_I2C_BUS];
   wires[0] = &Wire;
-  wires[1] = &swWire1;
-  wires[2] = &swWire2;
-  wires[3] = &swWire3;
+  wires[1] = &Wire1;
+  wires[2] = &Wire2;
 
   // Configure I2C buses
   for (uint8_t b = 0; b < NUM_I2C_BUS; b++) {
