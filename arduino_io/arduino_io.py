@@ -30,8 +30,7 @@ def serial_write(ser, out, flush=True):
         ser.flushOutput()
     ser.write(out)
 
-def serial_read(ser, length=0, timeout=0.1):
-    ser.timeout = timeout if timeout > 0 else None
+def serial_read(ser, length=0):
     r = ser.read(length)
     return r
 
@@ -279,8 +278,7 @@ def write(uid, reg, data):
         out = hex_to_bytes(hex)
         serial_write(ser, out, False)
 
-    # Escape after 10 ms
-    readback = bytes_to_ord(serial_read(ser, 1, 0.01))
+    readback = bytes_to_ord(serial_read(ser, 1))
     if len(readback) == 1:
         if readback[0] == 5:
             return STATUS_OK, len(data)
