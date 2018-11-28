@@ -26,11 +26,11 @@ def hex_to_bytes(x):
 
 def serial_write(ser, out, flush=True):
     if flush:
-        ser.flushInput()
-        ser.flushOutput()
+        ser.reset_input_buffer()
+        ser.reset_output_buffer()
     ser.write(out)
 
-def serial_read(ser, length=0):
+def serial_read(ser, length=1):
     r = ser.read(length)
     return r
 
@@ -43,7 +43,6 @@ def arduino_check(ser):
     while start_delay < 10:
         serial_write(ser, out)
 
-        # Escape after 100 ms
         readback = bytes_to_str(serial_read(ser, 8))
         if len(readback) == 8:
             break
@@ -149,14 +148,14 @@ def i2c_clock(ser, clock):
     return STATUS_OK
 
 # Scan all I2C buses for all possible slave addresses
-def address_check(ser):
+def address_check(ser, addrs):
     devices = []
 
     num_bus = num_i2c_bus(ser)
     print('Found {} I2C bus(es)'.format(num_bus))
     for b in range(num_bus):
         # Scan all possible I2C addresses
-        for addr in range(8, 120):
+        for addr in addrs:
             uid = (ser, b, addr)
             status, num_write = write(uid, 0xdd, [0x00])
             if status == STATUS_OK:
@@ -166,15 +165,17 @@ def address_check(ser):
     return devices
 
 
-def enum():
+def enum(ports=[], baudrate=115200, addrs=range(8, 120)):
     devices = []
-    ports = serial.tools.list_ports.comports()
+    if len(ports) is 0:
+        ports = [p.device for p in serial.tools.list_ports.comports()]
 
     for port in ports:
         try:
-            ser = serial.Serial(port.device)
-            ser.baudrate = 115200
+            ser = serial.Serial(port)
+            ser.baudrate = baudrate
             ser.write_timeout = 0
+            ser.timeout = 1
             while not ser.isOpen():
                 pass
 
@@ -182,7 +183,7 @@ def enum():
                 print('Not Arduino')
                 continue
 
-            devices += address_check(ser)
+            devices += address_check(ser, addrs)
         except (OSError, serial.SerialException):
             pass
 
@@ -298,7 +299,7 @@ if __name__ == "__main__":
             val -= (1 << bits)
         return val
 
-    aio = enum()
+    aio = enum(baudrate=9600, addrs=[0x44, 0x45, 0x46, 0x47])
     if len(aio) == 0:
         exit()
 
@@ -327,10 +328,13 @@ if __name__ == "__main__":
     t = time.time()
     raw = []
     temp = []
+    count = 0
     while time.time() - t < timeout:
+    # while True:
         read(aio[module], 3, 4, data)
         raw.append(twos_comp((data[0] << 4) + (data[1] >> 4), 12))
         temp.append(twos_comp((data[2] << 4) + (data[3] >> 4), 12))
-        # print(raw[-1], temp[-1])
+        # print(count, time.time() - t, raw[-1], temp[-1])
+        count += 1
     print(np.round(np.mean(raw)), np.round(np.mean(temp)))
     close(aio[module][0])
