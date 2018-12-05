@@ -2,7 +2,6 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <SoftwareWire.h>
 
 /**
  * These function signatures are necessary so the file can get compiled
@@ -23,8 +22,6 @@ void handleDioRead();
 #define TGL_LED()               digitalWrite(LED_BUILTIN, digitalRead(LED_BUILTIN) == LOW ? 1 : 0)
 #define SET_LED()               digitalWrite(LED_BUILTIN, HIGH)
 #define CLR_LED()               digitalWrite(LED_BUILTIN, LOW)
-
-#define NUM_HW_I2C_BUS          WIRE_INTERFACES_COUNT
 
 
 #define SERIAL_BEGIN(com, baud) do { \
@@ -49,12 +46,14 @@ void handleDioRead();
 
 #if defined ADAFRUIT_METRO_M4_EXPRESS
 
+#include <SoftwareWire.h>
 #include <Adafruit_NeoPixel.h>
 
 #define DIO_PIN_MIN             1
 #define DIO_PIN_MAX             14
 
 #define I2C_CLK_LIMIT           1000000
+#define NUM_HW_I2C_BUS          WIRE_INTERFACES_COUNT
 #define NUM_SW_I2C_BUS          0
 #define PIN_SWWIRE_SCL          7
 #define PIN_SWWIRE_SDA          6
@@ -71,8 +70,18 @@ Adafruit_NeoPixel np = Adafruit_NeoPixel(NUM_NEOPIXEL, PIN_NEOPIXEL);
 #define COM_MAIN                Serial
 #define COM_MAIN_BEGIN()        SERIAL_BEGIN(COM_MAIN, 115200)
 
+uint8_t time_stamp[6] = {
+  0x30 | /* Y: */ 1,
+  0x30 | /* Y: */ 8,
+  0x30 | /* M: */ 1,
+  0x30 | /* M: */ 2,
+  0x30 | /* D: */ 0,
+  0x30 | /* D: */ 5
+};
+
 #elif defined ADAFRUIT_FEATHER_M0
 
+#include <SoftwareWire.h>
 #include <SPI.h>
 #include <Adafruit_BLE.h>
 #include <Adafruit_BluefruitLE_SPI.h>
@@ -81,6 +90,7 @@ Adafruit_NeoPixel np = Adafruit_NeoPixel(NUM_NEOPIXEL, PIN_NEOPIXEL);
 #define DIO_PIN_MAX             14
 
 #define I2C_CLK_LIMIT           1000000
+#define NUM_HW_I2C_BUS          WIRE_INTERFACES_COUNT
 #define NUM_SW_I2C_BUS          0
 #define NUM_I2C_BUS             (NUM_HW_I2C_BUS + NUM_SW_I2C_BUS)
 
@@ -97,6 +107,37 @@ Adafruit_BluefruitLE_SPI ble(BLE_SPI_CS, BLE_SPI_IRQ, BLE_SPI_RST);
                                 
 #define COM_DEBUG               Serial
 #define COM_DEBUG_BEGIN()       SERIAL_BEGIN(COM_DEBUG, 115200)
+
+uint8_t time_stamp[6] = {
+  0x30 | /* Y: */ 1,
+  0x30 | /* Y: */ 8,
+  0x30 | /* M: */ 1,
+  0x30 | /* M: */ 2,
+  0x30 | /* D: */ 0,
+  0x30 | /* D: */ 5
+};
+
+#elif defined ARDUINO_AVR_UNO
+
+#define DIO_PIN_MIN             1
+#define DIO_PIN_MAX             14
+
+#define I2C_CLK_LIMIT           400000
+#define NUM_HW_I2C_BUS          1
+#define NUM_SW_I2C_BUS          0
+#define NUM_I2C_BUS             (NUM_HW_I2C_BUS + NUM_SW_I2C_BUS)
+
+#define COM_MAIN                Serial
+#define COM_MAIN_BEGIN()        SERIAL_BEGIN(COM_MAIN, 115200)
+
+uint8_t time_stamp[6] = {
+  0x30 | /* Y: */ 1,
+  0x30 | /* Y: */ 8,
+  0x30 | /* M: */ 1,
+  0x30 | /* M: */ 0,
+  0x30 | /* D: */ 2,
+  0x30 | /* D: */ 4
+};
 
 #else
 
@@ -171,15 +212,6 @@ Adafruit_BluefruitLE_SPI ble(BLE_SPI_CS, BLE_SPI_IRQ, BLE_SPI_RST);
 #define ERROR_SENDDATA          'S'
 #define ERROR_DIO               'G'
 #define ERROR_UNESCAPE          'U'
-
-uint8_t time_stamp[6] = {
-  0x30 | /* Y: */ 1,
-  0x30 | /* Y: */ 8,
-  0x30 | /* M: */ 1,
-  0x30 | /* M: */ 2,
-  0x30 | /* D: */ 0,
-  0x30 | /* D: */ 4
-};
 
 
 String ident = "Arduino I2C-to-USB 1.0";
@@ -303,10 +335,16 @@ void setup() {
 
   // Configure I2C buses
   for (b = 0; b < NUM_I2C_BUS; b++) {
+#if defined ARDUINO_AVR_UNO
+    // Disable internal 5V pullups
+    pinMode(wiresSCL[b], INPUT);
+    pinMode(wiresSDA[b], INPUT);
+#else
     // Ensures software I2C lines [2, 7] are high when disconnected (floating), and 
     // hardware I2C lines (SCL, SDA) are low when disconnected (floating) (don't ask how)
     pinMode(wiresSCL[b], INPUT_PULLUP);
     pinMode(wiresSDA[b], INPUT_PULLUP);
+#endif
     
     wires[b]->begin();
     wires[b]->setClock(I2C_CLK_LIMIT);

@@ -1,8 +1,8 @@
 # Project_ARK
 
-### IMPORTANT: Arduino Uno support has been deprecated in this release; compatibility is only guaranteed with the Adafruit Metro M4 Express.
+### IMPORTANT: For a BLE connection, the Adafruit Feather M0 is required, along with a BLED112 dongle.
 
-Project ARK's goal is to replace existing Aardvark I2C bridge with Arduino Uno
+Project ARK's goal is to replace the existing Aardvark I2C bridge with an arduino
 board (Arduino Replaces aardvarK).  The project contains:
 
     arduino_io.py       Python interface that allow user to interact with the bridge
@@ -15,12 +15,17 @@ To use the scripts and firmware code, you need to have:
     Python 2.7 with required modules installed (run "pip install -r requirements.txt")
     Arduino IDE (download here https://www.arduino.cc/en/Main/Software)
     The Arduino modifications available in the arduino_wire repository installed
+    OPTIONAL: uf2conv.py (https://github.com/Microsoft/uf2/blob/master/utils/uf2conv.py)
 
-To build and install the module as a python package, run:
+To build and install the python module as a python package, run:
 
     pip install git+https://bitbucket.org/nextinput_sw/project_ark.git
 
-or, if there's no Internet connection, run:
+or, to specify a branch:
+
+    pip install git+https://bitbucket.org/nextinput_sw/project_ark.git@[branch]
+
+If there's no Internet connection, you can also run from the root directory:
 
     python setup.py sdist
     pip install dist/arduino_io-[latest_version].tar.gz
@@ -39,14 +44,14 @@ For example, to read 3 bytes from device 0x26, register 0x9d:
 
     "A 26 a 9d l 03 r"
 
-In addition to the main hardware I2C bus (SCL/SDA), an additional two hardware I2C buses are available as:
+In addition to the main hardware I2C bus (SCL/SDA), the Adafruit Metro M4 Express exposes an additional two hardware I2C buses:
 
     Bus     SCL     SDA
     -------------------
     1       A5      A4
     2       SCK     MOSI
 
-To enable these additional hardware I2C buses, you must select the board
+To enable these additional hardware I2C buses, the Arduino IDE must be targeting the board:
 
     Adafruit Metro M4 NI =^._.^= ∫ (SAMD51)
 

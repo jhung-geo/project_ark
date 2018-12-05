@@ -198,7 +198,7 @@ def _ble_write_confirm(ser):
         if ser.in_waiting >= _BLE_PACKET_HEADER_LENGTH:
             h = _bytes_to_ord(ser.read(_BLE_PACKET_HEADER_LENGTH))
             p = _bytes_to_ord(ser.read(_ble_payload_length(h)))
-            if _ble_packet_ident(h) == _BLE_PROCEDURE_COMPLETED:
+            if _ble_packet_ident(h) == _BLE_PROCEDURE_COMPLETED and p[1] == 0 and p[2] == 0:
                 break
 
 def _ble_read(ser, conn, rx):
@@ -264,10 +264,10 @@ def _i2c_length(length):
 def i2c_clock(uid, clock):
     ser = uid[0][0]
     ble = uid[0][1]
-    v = uid[0][2]
+    # v = uid[0][2]
     nb = uid[0][3]
     bus = uid[1]
-    addr = uid[2]
+    # addr = uid[2]
 
     if clock > 100 or clock <= 0:
         print('I2C clock {} out of range'.format(clock))
@@ -296,10 +296,10 @@ def i2c_clock(uid, clock):
 def i2c_pullup(uid, pullup):
     ser = uid[0][0]
     ble = uid[0][1]
-    v = uid[0][2]
+    # v = uid[0][2]
     nb = uid[0][3]
     bus = uid[1]
-    addr = uid[2]
+    # addr = uid[2]
 
     hex = '{}{}'.format(
         _i2c_bus(bus) if nb > 1 else '',
@@ -331,10 +331,10 @@ def i2c_pullup(uid, pullup):
 def _dio_pin(uid, pin):
     ser = uid[0][0]
     ble = uid[0][1]
-    v = uid[0][2]
-    nb = uid[0][3]
-    bus = uid[1]
-    addr = uid[2]
+    # v = uid[0][2]
+    # nb = uid[0][3]
+    # bus = uid[1]
+    # addr = uid[2]
 
     hex = '{}{:02X}'.format(
         _DIO_PIN,
@@ -357,10 +357,10 @@ def _dio_pin(uid, pin):
 def dio_mode(uid, pin, mode):
     ser = uid[0][0]
     ble = uid[0][1]
-    v = uid[0][2]
-    nb = uid[0][3]
-    bus = uid[1]
-    addr = uid[2]
+    # v = uid[0][2]
+    # nb = uid[0][3]
+    # bus = uid[1]
+    # addr = uid[2]
 
     _dio_pin(uid, pin)
 
@@ -389,10 +389,10 @@ def dio_mode(uid, pin, mode):
 def dio_read(uid, pin):
     ser = uid[0][0]
     ble = uid[0][1]
-    v = uid[0][2]
-    nb = uid[0][3]
-    bus = uid[1]
-    addr = uid[2]
+    # v = uid[0][2]
+    # nb = uid[0][3]
+    # bus = uid[1]
+    # addr = uid[2]
 
     _dio_pin(uid, pin)
 
@@ -420,10 +420,10 @@ def dio_read(uid, pin):
 def dio_write(uid, pin, level):
     ser = uid[0][0]
     ble = uid[0][1]
-    v = uid[0][2]
-    nb = uid[0][3]
-    bus = uid[1]
-    addr = uid[2]
+    # v = uid[0][2]
+    # nb = uid[0][3]
+    # bus = uid[1]
+    # addr = uid[2]
 
     _dio_pin(uid, pin)
 
@@ -461,9 +461,9 @@ def neopixel_color(uid, r, g, b):
     ser = uid[0][0]
     ble = uid[0][1]
     v = uid[0][2]
-    nb = uid[0][3]
-    bus = uid[1]
-    addr = uid[2]
+    # nb = uid[0][3]
+    # bus = uid[1]
+    # addr = uid[2]
 
     if ble or v < 181025:
         return STATUS_ERROR
@@ -509,17 +509,24 @@ def _arduino_check(uid):
     if ble:
         out = _ble_write_split_packets(ble[0], ble[1], out)
 
-    # Write packets
-    for o in out:
-        _log('Writing {}'.format(' '.join(['{:02X}'.format(b) for b in bytearray(o)])))
-        ser.write(o)
-        if ble:
-            _ble_write_confirm(ser)
+    # Try 5 times
+    for t in range(5):
+        # Write packets
+        for o in out:
+            _log('Writing {}'.format(' '.join(['{:02X}'.format(b) for b in bytearray(o)])))
+            ser.write(o)
+            if ble:
+                _ble_write_confirm(ser)
 
-    if ble:
-        r = _ble_read(ser, ble[0], ble[2])
-    else:
-        r = _bytes_to_ord(ser.read(8))
+        if ble:
+            r = _ble_read(ser, ble[0], ble[2])
+        else:
+            r = _bytes_to_ord(ser.read(8))
+
+        _log('Read back {}'.format(' '.join(['{:02X}'.format(b) for b in r])))
+
+        if len(r) >= 8:
+            break
 
     if len(r) >= 8:
         if chr(r[-8]) == chr(r[-7]) == 'z':
@@ -674,9 +681,9 @@ def _ble_check(uid):
 def _addr_check(uid, addrs):
     devices = []
 
-    ser = uid[0]
-    ble = uid[1]
-    v = uid[2]
+    # ser = uid[0]
+    # ble = uid[1]
+    # v = uid[2]
     nb = uid[3]
 
     for b in range(nb):
@@ -694,7 +701,23 @@ def _addr_check(uid, addrs):
 
 
 
-def enum(ports=[], baudrate=115200, addrs=range(8, 120)):
+def enum(ports=[], baud=115200, addrs=range(8, 120)):
+    """
+    Enumerates connected devices
+
+    Initializes the communication bridge first, if necessary.
+    Stores the identification data for each device into a
+    protocol-dependent representation.
+
+    Args:
+    ports:    A list of serial ports to probe. If empty, this function
+              will probe all available ports.
+    baud:     The serial port baud rate.
+    addrs:    A list of I2C slave addresses to probe.
+
+    Returns:
+    devices:  A list of connected device unique identifiers.
+    """
     devices = []
     if len(ports) is 0:
         ports = [p.device for p in serial.tools.list_ports.comports()]
@@ -703,7 +726,7 @@ def enum(ports=[], baudrate=115200, addrs=range(8, 120)):
     for port in ports:
         try:
             ser = serial.Serial(port)
-            ser.baudrate = baudrate
+            ser.baudrate = baud
             ser.write_timeout = 0
             ser.timeout = 1
 
@@ -737,9 +760,28 @@ def enum(ports=[], baudrate=115200, addrs=range(8, 120)):
 
 
 def read(uid, reg, length, data):
+    """
+    Reads data from a target device.
+
+    First performs a write to the device with the target register
+    as the payload before reading back the device data.
+
+    Args:
+    uid:    Protocol-specific identification data for the target
+            device.
+    reg:    The register address to start reading from, or None
+            to continue from the device register address pointer.
+    length: The number of bytes to read.
+    data:   The list to fill with read data.
+
+    Returns:
+    status: Operation status code.
+    count:  The number of bytes read from the target.
+    """
+
     ser = uid[0][0]
     ble = uid[0][1]
-    v = uid[0][2]
+    # v = uid[0][2]
     nb = uid[0][3]
     bus = uid[1]
     addr = uid[2]
@@ -819,9 +861,23 @@ def read(uid, reg, length, data):
             return STATUS_OK, len(data)
 
 def write(uid, reg, data):
+    """
+    Writes data to a target device.
+
+    Args:
+    uid:    Protocol-specific identification data for the target
+            device.
+    reg:    The register address to start writing to
+    data:   The list of bytes to write to the target.
+
+    Returns:
+    status: Operation status code.
+    count:  The number of bytes written to the target.
+    """
+
     ser = uid[0][0]
     ble = uid[0][1]
-    v = uid[0][2]
+    # v = uid[0][2]
     nb = uid[0][3]
     bus = uid[1]
     addr = uid[2]
@@ -885,6 +941,8 @@ def close(uid):
         ser.write(_ble_cmd_connection_disconnect(0))
         h = _bytes_to_ord(ser.read(_BLE_PACKET_HEADER_LENGTH))
         p = _bytes_to_ord(ser.read(_ble_payload_length(h)))
+        if _ble_packet_ident(h) != _BLE_PROCEDURE_COMPLETED or p[1] != 0 or p[2] != 0:
+            return STATUS_ERROR
 
     ser.close()
 
@@ -942,3 +1000,4 @@ if __name__ == '__main__':
         print(raw[-1], temp[-1])
     print(np.round(np.mean(raw)), np.round(np.mean(temp)))
     [close(d) for d in devs]
+
