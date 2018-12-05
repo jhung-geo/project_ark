@@ -1,12 +1,8 @@
 // I2C to USB Adapter using Arduino
 
 #include <Arduino.h>
-#include <SPI.h>
 #include <Wire.h>
 #include <SoftwareWire.h>
-#include <Adafruit_BLE.h>
-#include <Adafruit_BluefruitLE_SPI.h>
-#include <Adafruit_NeoPixel.h>
 
 /**
  * These function signatures are necessary so the file can get compiled
@@ -27,6 +23,88 @@ void handleDioRead();
 #define TGL_LED()               digitalWrite(LED_BUILTIN, digitalRead(LED_BUILTIN) == LOW ? 1 : 0)
 #define SET_LED()               digitalWrite(LED_BUILTIN, HIGH)
 #define CLR_LED()               digitalWrite(LED_BUILTIN, LOW)
+
+#define NUM_HW_I2C_BUS          WIRE_INTERFACES_COUNT
+
+
+#define SERIAL_BEGIN(com, baud) do { \
+                                  com.begin(baud); \
+                                } while (false)
+#define BLE_BEGIN(com)          do { \
+                                  com.begin(); \
+                                  if (BLE_RESET_ENABLE) { \
+                                    com.factoryReset(); \
+                                  } \
+                                  com.verbose(false); \
+                                  com.echo(false); \
+                                  while (!com.isConnected()) { \
+                                    delay(500); \
+                                  } \
+                                  if (com.isVersionAtLeast(BLE_MIN_FW_VERSION)) { \
+                                    com.sendCommandCheckOK("AT+HWModeLED=" BLE_MODE_LED_BEHAVIOR); \
+                                  } \
+                                  com.setMode(BLUEFRUIT_MODE_DATA); \
+                                } while (false)
+
+
+#if defined ADAFRUIT_METRO_M4_EXPRESS
+
+#include <Adafruit_NeoPixel.h>
+
+#define DIO_PIN_MIN             1
+#define DIO_PIN_MAX             14
+
+#define I2C_CLK_LIMIT           1000000
+#define NUM_SW_I2C_BUS          0
+#define PIN_SWWIRE_SCL          7
+#define PIN_SWWIRE_SDA          6
+#define PIN_SWWIRE1_SCL         5
+#define PIN_SWWIRE1_SDA         4
+#define PIN_SWWIRE2_SCL         3
+#define PIN_SWWIRE2_SDA         2
+#define NUM_I2C_BUS             (NUM_HW_I2C_BUS + NUM_SW_I2C_BUS)
+
+#define NUM_NEOPIXEL            1
+#define PIN_NEOPIXEL            40
+Adafruit_NeoPixel np = Adafruit_NeoPixel(NUM_NEOPIXEL, PIN_NEOPIXEL);
+
+#define COM_MAIN                Serial
+#define COM_MAIN_BEGIN()        SERIAL_BEGIN(COM_MAIN, 115200)
+
+#elif defined ADAFRUIT_FEATHER_M0
+
+#include <SPI.h>
+#include <Adafruit_BLE.h>
+#include <Adafruit_BluefruitLE_SPI.h>
+
+#define DIO_PIN_MIN             9
+#define DIO_PIN_MAX             14
+
+#define I2C_CLK_LIMIT           1000000
+#define NUM_SW_I2C_BUS          0
+#define NUM_I2C_BUS             (NUM_HW_I2C_BUS + NUM_SW_I2C_BUS)
+
+#define BLE_RESET_ENABLE        1
+#define BLE_MIN_FW_VERSION      "0.6.6"
+#define BLE_MODE_LED_BEHAVIOR   "MODE"
+#define BLE_SPI_CS              8
+#define BLE_SPI_IRQ             7
+#define BLE_SPI_RST             4
+Adafruit_BluefruitLE_SPI ble(BLE_SPI_CS, BLE_SPI_IRQ, BLE_SPI_RST);
+
+#define COM_MAIN                ble
+#define COM_MAIN_BEGIN()        BLE_BEGIN(COM_MAIN)
+                                
+#define COM_DEBUG               Serial
+#define COM_DEBUG_BEGIN()       SERIAL_BEGIN(COM_DEBUG, 115200)
+
+#else
+
+#error "Board not supported"
+
+#endif
+
+#define DEBUG
 
 // General
 #define CMD_HANDSHAKE           'Z'
@@ -94,62 +172,85 @@ void handleDioRead();
 #define ERROR_DIO               'G'
 #define ERROR_UNESCAPE          'U'
 
-#define I2C_CLK_LIMIT           1000000
-
-#define NUM_I2C_BUS             1
-#define SW_WIRE_1_SCL           7
-#define SW_WIRE_1_SDA           6
-#define SW_WIRE_2_SCL           5
-#define SW_WIRE_2_SDA           4
-#define SW_WIRE_3_SCL           3
-#define SW_WIRE_3_SDA           2
-
-#define BLE_RESET_ENABLE        1
-#define BLE_MIN_FW_VERSION      "0.6.6"
-#define BLE_MODE_LED_BEHAVIOR   "MODE"
-#define BLE_SPI_CS              8
-#define BLE_SPI_IRQ             7
-#define BLE_SPI_RST             4
-
-#define NUM_NEOPIXEL            1
-#define PIN_NEOPIXEL            40
-
-
 uint8_t time_stamp[6] = {
   0x30 | /* Y: */ 1,
   0x30 | /* Y: */ 8,
   0x30 | /* M: */ 1,
-  0x30 | /* M: */ 0,
-  0x30 | /* D: */ 2,
-  0x30 | /* D: */ 5
+  0x30 | /* M: */ 2,
+  0x30 | /* D: */ 0,
+  0x30 | /* D: */ 4
 };
 
 
 String ident = "Arduino I2C-to-USB 1.0";
 
-
-//SoftwareWire swWire1(SW_WIRE_1_SDA, SW_WIRE_1_SCL, true, false);
-//SoftwareWire swWire2(SW_WIRE_2_SDA, SW_WIRE_2_SCL, true, false);
-//SoftwareWire swWire3(SW_WIRE_3_SDA, SW_WIRE_3_SCL, true, false);
-
 TwoWire **wires;
+
+#if NUM_SW_I2C_BUS > 0
+SoftwareWire swWire(PIN_SWWIRE_SDA, PIN_SWWIRE_SCL, true, false);
+#endif
+
+#if NUM_SW_I2C_BUS > 1
+SoftwareWire swWire1(PIN_SWWIRE1_SDA, PIN_SWWIRE1_SCL, true, false);
+#endif
+
+#if NUM_SW_I2C_BUS > 2
+SoftwareWire swWire2(PIN_SWWIRE2_SDA, PIN_SWWIRE2_SCL, true, false);
+#endif
 
 uint8_t activeWire = 0;
 
 uint8_t wiresSCL[NUM_I2C_BUS] = {
+#if NUM_HW_I2C_BUS > 0
   PIN_WIRE_SCL,
-//  PIN_WIRE1_SCL,
-//  PIN_WIRE2_SCL,
+#endif
+
+#if NUM_HW_I2C_BUS > 1
+  PIN_WIRE1_SCL,
+#endif
+
+#if NUM_HW_I2C_BUS > 2
+  PIN_WIRE2_SCL,
+#endif
+
+#if NUM_SW_I2C_BUS > 0
+  PIN_SWWIRE_SCL,
+#endif
+
+#if NUM_SW_I2C_BUS > 1
+  PIN_SWWIRE1_SCL,
+#endif
+
+#if NUM_SW_I2C_BUS > 2
+  PIN_SWWIRE2_SCL,
+#endif
 };
 
 uint8_t wiresSDA[NUM_I2C_BUS] = {
+#if NUM_HW_I2C_BUS > 0
   PIN_WIRE_SDA,
-//  PIN_WIRE1_SDA,
-//  PIN_WIRE2_SDA,
+#endif
+
+#if NUM_HW_I2C_BUS > 1
+  PIN_WIRE1_SDA,
+#endif
+
+#if NUM_HW_I2C_BUS > 2
+  PIN_WIRE2_SDA,
+#endif
+
+#if NUM_SW_I2C_BUS > 0
+  PIN_SWWIRE_SDA,
+#endif
+
+#if NUM_SW_I2C_BUS > 1
+  PIN_SWWIRE1_SDA,
+#endif
+
+#if NUM_SW_I2C_BUS > 2
+  PIN_SWWIRE2_SDA,
+#endif
 };
-
-
-Adafruit_BluefruitLE_SPI ble(BLE_SPI_CS, BLE_SPI_IRQ, BLE_SPI_RST);
 
 
 uint8_t state = STATE_INIT;
@@ -163,27 +264,45 @@ uint8_t read_buf[32];
 uint8_t dio_pin = 0;
 uint8_t dio_mode = 3;
 
-Adafruit_NeoPixel np = Adafruit_NeoPixel(NUM_NEOPIXEL, PIN_NEOPIXEL);
-
 void setup() {
   // Initialize LED
   pinMode(LED_BUILTIN, OUTPUT);
-  
+
+#ifdef ADAFRUIT_NEOPIXEL_H
   // Initialize NeoPixel
   np.begin();
   np.show();
-  
-  // Initialize the serial communication
-  Serial.begin(115200);
+#endif
 
   // Initialize I2C buses
-  wires = new TwoWire*[NUM_I2C_BUS];
-  wires[0] = &Wire;
-//  wires[1] = &Wire1;
-//  wires[2] = &Wire2;
+  wires = new TwoWire*[NUM_I2C_BUS];  
+  uint8_t b = 0;
+#if NUM_HW_I2C_BUS > 0
+  wires[b++] = &Wire;
+#endif
+
+#if NUM_HW_I2C_BUS > 1
+  wires[b++] = &Wire1;
+#endif
+
+#if NUM_HW_I2C_BUS > 2
+  wires[b++] = &Wire2;
+#endif
+
+#if NUM_SW_I2C_BUS > 0
+  wires[b++] = &swWire;
+#endif
+
+#if NUM_SW_I2C_BUS > 1
+  wires[b++] = &swWire1;
+#endif
+
+#if NUM_SW_I2C_BUS > 2
+  wires[b++] = &swWire2;
+#endif
 
   // Configure I2C buses
-  for (uint8_t b = 0; b < NUM_I2C_BUS; b++) {
+  for (b = 0; b < NUM_I2C_BUS; b++) {
     // Ensures software I2C lines [2, 7] are high when disconnected (floating), and 
     // hardware I2C lines (SCL, SDA) are low when disconnected (floating) (don't ask how)
     pinMode(wiresSCL[b], INPUT_PULLUP);
@@ -196,20 +315,13 @@ void setup() {
   // Reset state machine
   resetAdapter();
 
-  // Initialize the bluetooth module
-  ble.begin();
-  if (BLE_RESET_ENABLE) {
-    ble.factoryReset();
-  }
-  ble.verbose(false);
-  ble.echo(false);
-  while (!ble.isConnected()) {
-    delay(500);
-  }
-  if (ble.isVersionAtLeast(BLE_MIN_FW_VERSION)) {
-    ble.sendCommandCheckOK("AT+HWModeLED=" BLE_MODE_LED_BEHAVIOR);
-  }
-  ble.setMode(BLUEFRUIT_MODE_DATA);
+#if defined DEBUG && defined COM_DEBUG
+  // Initialize debug communication
+  COM_DEBUG_BEGIN();
+#endif
+  
+  // Initialize the main communication
+  COM_MAIN_BEGIN();
 }
 
 void resetAdapter() {
@@ -221,21 +333,23 @@ void resetAdapter() {
 }
 
 void loop() {
-  if (ble.available()) {
+  if (COM_MAIN.available()) {
     if (state == STATE_ERROR) {
       handleError();
     }
 
     // Read and handle data from serial port
-    char cmd = ble.read();
-    /*
-    Serial.println();
-    Serial.print(cmd);
-    Serial.print(" [0x");
-    if (cmd <= 0xF) Serial.print(F("0"));
-    Serial.print(cmd, HEX);
-    Serial.print("] ");
-    */
+    char cmd = COM_MAIN.read();
+
+#if defined DEBUG && defined COM_DEBUG
+    COM_DEBUG.println();
+    COM_DEBUG.print(cmd);
+    COM_DEBUG.print(" [0x");
+    if (cmd <= 0xF) COM_DEBUG.print(F("0"));
+    COM_DEBUG.print(cmd, HEX);
+    COM_DEBUG.print("] ");
+#endif
+    
     if (cmd >= 0) {
       handleCommand(cmd);
     }
@@ -259,29 +373,31 @@ void handleCommand(uint8_t cmd) {
     case CMD_HANDSHAKE:
       // In state HANDSHAKE, the host must repeat the HANDSHAKE command
       // for the handshake to occur
-      while (!ble.available()) {
+      while (!COM_MAIN.available()) {
         delay(1);
         if (millis() - t0 > 100) {
           state = STATE_INIT;
           return;
         }
       }
-      read_buf[0] = ble.read();
-      /*
-      Serial.print((char)read_buf[0]);
-      Serial.print(" [0x");
-      if (read_buf[0] <= 0xF) Serial.print(F("0"));
-      Serial.print((char)read_buf[0], HEX);
-      Serial.print("] ");
-      */
+      read_buf[0] = COM_MAIN.read();
+
+#if defined DEBUG && defined COM_DEBUG
+      COM_DEBUG.print((char)read_buf[0]);
+      COM_DEBUG.print(" [0x");
+      if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
+      COM_DEBUG.print((char)read_buf[0], HEX);
+      COM_DEBUG.print("] ");
+#endif
+      
       if (read_buf[0] == CMD_HANDSHAKE) {
         read_buf[0] = 0x7A;
         read_buf[1] = 0x7A;
         for (uint8_t i = 0; i < 6; i++) {
           read_buf[i + 2] = time_stamp[i];
         }
-        ble.write(read_buf, 8);
-        ble.flush();
+        COM_MAIN.write(read_buf, 8);
+        COM_MAIN.flush();
       } else {
         state = STATE_ERROR;
         error = ERROR_CMD;
@@ -289,7 +405,7 @@ void handleCommand(uint8_t cmd) {
       break;
 
     case CMD_GET_ERROR:
-      ble.write(error);
+      COM_MAIN.write(error);
       break;
 
     case CMD_GET_IDENT:
@@ -297,30 +413,32 @@ void handleCommand(uint8_t cmd) {
       break;
 
     case CMD_GET_STATE:
-      ble.write(state);
+      COM_MAIN.write(state);
       break;
 
     case CMD_GET_NUM_I2C_BUS:
-      ble.write(NUM_I2C_BUS);
+      COM_MAIN.write(NUM_I2C_BUS);
       break;
 
     case CMD_I2C_BUS:
       // In state BUS, the passed byte denotes the I2C bus to activate
-      while (!ble.available()) {
+      while (!COM_MAIN.available()) {
         delay(1);
         if (millis() - t0 > 100) {
           state = STATE_INIT;
           return;
         }
       }
-      read_buf[0] = ble.read();
-      /*
-      Serial.print((char)read_buf[0]);
-      Serial.print(" [0x");
-      if (read_buf[0] <= 0xF) Serial.print(F("0"));
-      Serial.print((char)read_buf[0], HEX);
-      Serial.print("] ");
-      */
+      read_buf[0] = COM_MAIN.read();
+
+#if defined DEBUG && defined COM_DEBUG
+      COM_DEBUG.print((char)read_buf[0]);
+      COM_DEBUG.print(" [0x");
+      if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
+      COM_DEBUG.print((char)read_buf[0], HEX);
+      COM_DEBUG.print("] ");
+#endif
+      
       if (read_buf[0] < NUM_I2C_BUS) {
         if (activeWire != read_buf[0]) {
           activeWire = read_buf[0];
@@ -335,21 +453,23 @@ void handleCommand(uint8_t cmd) {
     case CMD_SET_CLOCK:
       // In the CLOCK state, the passed byte indicates the desired I2C
       // clock speed (in 10kHz)
-      while (!ble.available()) {
+      while (!COM_MAIN.available()) {
         delay(1);
         if (millis() - t0 > 100) {
           state = STATE_INIT;
           return;
         }
       }
-      read_buf[0] = ble.read();
-      /*
-      Serial.print((char)read_buf[0]);
-      Serial.print(" [0x");
-      if (read_buf[0] <= 0xF) Serial.print(F("0"));
-      Serial.print((char)read_buf[0], HEX);
-      Serial.print("] ");
-      */
+      read_buf[0] = COM_MAIN.read();
+
+#if defined DEBUG && defined COM_DEBUG
+      COM_DEBUG.print((char)read_buf[0]);
+      COM_DEBUG.print(" [0x");
+      if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
+      COM_DEBUG.print((char)read_buf[0], HEX);
+      COM_DEBUG.print("] ");
+#endif
+      
       wires[activeWire]->endTransmission();
       wires[activeWire]->setClock(min(read_buf[0] * 10000, I2C_CLK_LIMIT));
       resetAdapter();
@@ -370,42 +490,46 @@ void handleCommand(uint8_t cmd) {
     case CMD_I2C_ADDRESS:
       // In state ADDRESS, the passed byte denotes the address upon
       // which further commands will act
-      while (!ble.available()) {
+      while (!COM_MAIN.available()) {
         delay(1);
         if (millis() - t0 > 100) {
           state = STATE_INIT;
           return;
         }
       }
-      read_buf[0] = ble.read();
-      /*
-      Serial.print((char)read_buf[0]);
-      Serial.print(" [0x");
-      if (read_buf[0] <= 0xF) Serial.print(F("0"));
-      Serial.print((char)read_buf[0], HEX);
-      Serial.print("] ");
-      */
+      read_buf[0] = COM_MAIN.read();
+
+#if defined DEBUG && defined COM_DEBUG
+      COM_DEBUG.print((char)read_buf[0]);
+      COM_DEBUG.print(" [0x");
+      if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
+      COM_DEBUG.print((char)read_buf[0], HEX);
+      COM_DEBUG.print("] ");
+#endif
+      
       address = read_buf[0];
       break;
 
     case CMD_I2C_LENGTH:
       // In state LENGTH, the passed byte defines the number of bytes
       // to read or write
-      while (!ble.available()) {
+      while (!COM_MAIN.available()) {
         delay(1);
         if (millis() - t0 > 100) {
           state = STATE_INIT;
           return;
         }
       }
-      read_buf[0] = ble.read();
-      /*
-      Serial.print((char)read_buf[0]);
-      Serial.print(" [0x");
-      if (read_buf[0] <= 0xF) Serial.print(F("0"));
-      Serial.print((char)read_buf[0], HEX);
-      Serial.print("] ");
-      */
+      read_buf[0] = COM_MAIN.read();
+
+#if defined DEBUG && defined COM_DEBUG
+      COM_DEBUG.print((char)read_buf[0]);
+      COM_DEBUG.print(" [0x");
+      if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
+      COM_DEBUG.print((char)read_buf[0], HEX);
+      COM_DEBUG.print("] ");
+#endif
+      
       if (read_buf[0] > 32) {
         state = STATE_ERROR;
         error = ERROR_LENGTH;
@@ -431,21 +555,23 @@ void handleCommand(uint8_t cmd) {
       // In the WRITE state, accept as many data bytes as specified by a
       // previous LENGTH command, writing them to the target slave address
       for (uint8_t i = 0; i < length; i++) {
-        while (!ble.available()) {
+        while (!COM_MAIN.available()) {
           delay(1);
           if (millis() - t0 > 100) {
             state = STATE_INIT;
             return;
           }
         }
-        read_buf[0] = ble.read();
-        /*
-        Serial.print((char)read_buf[0]);
-        Serial.print(" [0x");
-        if (read_buf[0] <= 0xF) Serial.print(F("0"));
-        Serial.print((char)read_buf[0], HEX);
-        Serial.print("] ");
-        */
+        read_buf[0] = COM_MAIN.read();
+
+#if defined DEBUG && defined COM_DEBUG
+        COM_DEBUG.print((char)read_buf[0]);
+        COM_DEBUG.print(" [0x");
+        if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
+        COM_DEBUG.print((char)read_buf[0], HEX);
+        COM_DEBUG.print("] ");
+#endif
+        
         if (wires[activeWire]->write(read_buf[0]) == 0) {
           state = STATE_ERROR;
           error = ERROR_WRITEDATA;
@@ -468,8 +594,8 @@ void handleCommand(uint8_t cmd) {
       }
 
       if (stop) {
-        ble.write(STATE_WRITE);
-        ble.flush();
+        COM_MAIN.write(STATE_WRITE);
+        COM_MAIN.flush();
       }
 
       stop = 1;
@@ -482,31 +608,33 @@ void handleCommand(uint8_t cmd) {
       break;
 
     case CMD_GET_ADDRESS:
-      ble.write(address);
+      COM_MAIN.write(address);
       break;
 
     case CMD_GET_LENGTH:
-      ble.write(length);
+      COM_MAIN.write(length);
       break;
       
     case CMD_DIO_PIN:
       // In the DIO_PIN state, the passed byte indicates the pin to operate on
-      while (!ble.available()) {
+      while (!COM_MAIN.available()) {
         delay(1);
         if (millis() - t0 > 100) {
           state = STATE_INIT;
           return;
         }
       }
-      read_buf[0] = ble.read();
-      /*
-      Serial.print((char)read_buf[0]);
-      Serial.print(" [0x");
-      if (read_buf[0] <= 0xF) Serial.print(F("0"));
-      Serial.print((char)read_buf[0], HEX);
-      Serial.print("] ");
-      */
-      if (read_buf[0] > 1 && read_buf[0] < 14) {
+      read_buf[0] = COM_MAIN.read();
+
+#if defined DEBUG && defined COM_DEBUG
+      COM_DEBUG.print((char)read_buf[0]);
+      COM_DEBUG.print(" [0x");
+      if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
+      COM_DEBUG.print((char)read_buf[0], HEX);
+      COM_DEBUG.print("] ");
+#endif
+      
+      if (read_buf[0] > DIO_PIN_MIN && read_buf[0] < DIO_PIN_MAX) {
         dio_pin = read_buf[0];
       } else {
         state = STATE_ERROR;
@@ -516,39 +644,43 @@ void handleCommand(uint8_t cmd) {
 
     case CMD_DIO_MODE:
       // In the DIO_MODE state, the passed byte sets the active pin mode
-      while (!ble.available()) {
+      while (!COM_MAIN.available()) {
         delay(1);
         if (millis() - t0 > 100) {
           state = STATE_INIT;
           return;
         }
       }
-      read_buf[0] = ble.read();
-      /*
-      Serial.print((char)read_buf[0]);
-      Serial.print(" [0x");
-      if (read_buf[0] <= 0xF) Serial.print(F("0"));
-      Serial.print((char)read_buf[0], HEX);
-      Serial.print("] ");
-      */
-      dio_mode = read_buf[0];
-      switch (dio_mode) {
-        case 0:
-          pinMode(dio_pin, INPUT);
-          break;
-          
-        case 1:
-          pinMode(dio_pin, OUTPUT);
-          break;
-          
-        case 2:
-          pinMode(dio_pin, INPUT_PULLUP);
-          break;
+      read_buf[0] = COM_MAIN.read();
 
-        default:
-          state = STATE_ERROR;
-          error = ERROR_DIO;
-          break;
+#if defined DEBUG && defined COM_DEBUG
+      COM_DEBUG.print((char)read_buf[0]);
+      COM_DEBUG.print(" [0x");
+      if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
+      COM_DEBUG.print((char)read_buf[0], HEX);
+      COM_DEBUG.print("] ");
+#endif
+      
+      if (dio_pin > DIO_PIN_MIN && dio_pin < DIO_PIN_MAX) {
+        dio_mode = read_buf[0];
+        switch (dio_mode) {
+          case 0:
+            pinMode(dio_pin, INPUT);
+            break;
+            
+          case 1:
+            pinMode(dio_pin, OUTPUT);
+            break;
+            
+          case 2:
+            pinMode(dio_pin, INPUT_PULLUP);
+            break;
+  
+          default:
+            state = STATE_ERROR;
+            error = ERROR_DIO;
+            break;
+        }
       }
       break;
 
@@ -558,45 +690,53 @@ void handleCommand(uint8_t cmd) {
 
     case CMD_DIO_WRITE:
       // In the DIO_WRITE state, the passed byte represents the pin logic level
-      while (!ble.available()) {
+      while (!COM_MAIN.available()) {
         delay(1);
         if (millis() - t0 > 100) {
           state = STATE_INIT;
           return;
         }
       }
-      read_buf[0] = ble.read();
-      /*
-      Serial.print((char)read_buf[0]);
-      Serial.print(" [0x");
-      if (read_buf[0] <= 0xF) Serial.print(F("0"));
-      Serial.print((char)read_buf[0], HEX);
-      Serial.print("] ");
-      */
-      digitalWrite(dio_pin, read_buf[0] == 0 ? LOW : HIGH);
+      read_buf[0] = COM_MAIN.read();
+
+#if defined DEBUG && defined COM_DEBUG
+      COM_DEBUG.print((char)read_buf[0]);
+      COM_DEBUG.print(" [0x");
+      if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
+      COM_DEBUG.print((char)read_buf[0], HEX);
+      COM_DEBUG.print("] ");
+#endif
+      
+      if (dio_pin > DIO_PIN_MIN && dio_pin < DIO_PIN_MAX) {
+        digitalWrite(dio_pin, read_buf[0] == 0 ? LOW : HIGH);
+      }
       break;
 
     case CMD_NP_COLOR:
       // In the NP_COLOR state, accept 3 bytes representing R, G, and B values
       for (uint8_t i = 0; i < 3; i++) {
-        while (!ble.available()) {
+        while (!COM_MAIN.available()) {
           delay(1);
           if (millis() - t0 > 100) {
             state = STATE_INIT;
             return;
           }
         }
-        read_buf[i] = ble.read();
-        /*
-        Serial.print((char)read_buf[0]);
-        Serial.print(" [0x");
-        if (read_buf[0] <= 0xF) Serial.print(F("0"));
-        Serial.print((char)read_buf[0], HEX);
-        Serial.print("] ");
-        */
+        read_buf[i] = COM_MAIN.read();
+
+#if defined DEBUG && defined COM_DEBUG
+        COM_DEBUG.print((char)read_buf[0]);
+        COM_DEBUG.print(" [0x");
+        if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
+        COM_DEBUG.print((char)read_buf[0], HEX);
+        COM_DEBUG.print("] ");
+#endif
+        
       }
+#ifdef ADAFRUIT_NEOPIXEL_H
       np.setPixelColor(0, read_buf[0], read_buf[1], read_buf[2]);
       np.show();
+#endif
       break;
 
     default:
@@ -609,7 +749,7 @@ void handleCommand(uint8_t cmd) {
 
 void handleError() {
   // Signal error to host
-  ble.write(error);
+  COM_MAIN.write(error);
   // Return to initial state
   resetAdapter();
 }
@@ -618,10 +758,10 @@ void handleIdent() {
   int len = ident.length();
   char buf[len + 1];
   ident.toCharArray(buf, len + 1);
-  ble.write(len);
+  COM_MAIN.write(len);
   // We can use "Serial.write" here because we know the IDENT string
   // doesn't contain any characters which would have to get escaped.
-  ble.write((uint8_t*)buf, len);
+  COM_MAIN.write((uint8_t*)buf, len);
 }
 
 void handleWireRead() {
@@ -647,18 +787,18 @@ void handleWireRead() {
     read_buf[i] = wires[activeWire]->read();
   }
 
-  ble.write(read_buf, a);
-  ble.flush();
-	
+  COM_MAIN.write(read_buf, a);
+  COM_MAIN.flush();
+  
   if (wires[activeWire]->available() != 0) {
     state = STATE_ERROR;
   }
 }
 
 void handleDioRead() {
-  if (dio_pin > 1 && dio_pin < 14) {
+  if (dio_pin > DIO_PIN_MIN && dio_pin < DIO_PIN_MAX) {
     byte level = digitalRead(dio_pin);
-    ble.write(level == LOW ? 0 : 1);
-    ble.flush();
+    COM_MAIN.write(level == LOW ? 0 : 1);
+    COM_MAIN.flush();
   }
 }
