@@ -25,7 +25,8 @@ _I2C_CLOCK = '43'
 _I2C_PULLUP_ON = '50'
 _I2C_PULLUP_OFF = '70'
 
-_I2C_READ_MAX_PAYLOAD = 20
+_I2C_BLE_READ_MAX_PAYLOAD = 20
+_I2C_SER_READ_MAX_PAYLOAD = 32
 _I2C_READ = '52'
 _I2C_READ_RESTART = '72'
 
@@ -272,7 +273,7 @@ def i2c_clock(uid, clock):
         print('I2C clock {} out of range'.format(clock))
         return STATUS_ERROR
 
-    hex = '{}{}{}'.format(
+    hex = '{}{}{:02X}'.format(
         _i2c_bus(bus) if nb > 1 else '',
         _I2C_CLOCK,
         clock)
@@ -743,6 +744,8 @@ def read(uid, reg, length, data):
     bus = uid[1]
     addr = uid[2]
 
+    _I2C_READ_MAX_PAYLOAD = _I2C_BLE_READ_MAX_PAYLOAD if ble else _I2C_SER_READ_MAX_PAYLOAD
+
     # Bus, address, register address
     hex = '{}{}{}{}{:02X}'.format(
         _i2c_bus(bus) if nb > 1 else '',
@@ -887,3 +890,55 @@ def close(uid):
 
     return STATUS_OK
 
+
+
+
+
+
+
+
+
+if __name__ == '__main__':
+    import numpy as np
+
+    def twos_comp(val, bits):
+        if (val & (1 << (bits - 1))) != 0:
+            val -= (1 << bits)
+        return val
+
+    devs = enum(addrs=range(0x44, 0x48))
+    if len(devs) == 0:
+        exit()
+
+    data = []
+    module = -1
+    preload = 26
+    gain = 3
+    timeout = 10
+
+    i2c_clock(devs[-1], 10)
+    write(devs[module], 8, [0xF0])
+    time.sleep(0.01)
+    i2c_clock(devs[-1], 20)
+    read(devs[module], 8, 1, data)
+    print(data)
+    i2c_clock(devs[-1], 30)
+    write(devs[module], 11, [preload << 3])
+    time.sleep(0.01)
+    i2c_clock(devs[-1], 100)
+    read(devs[module], 11, 1, data)
+    print(data)
+    write(devs[module], 0, [0x9B, (gain << 4) + 0x05])
+    time.sleep(0.01)
+    print()
+
+    t = time.time()
+    raw = []
+    temp = []
+    while time.time() - t < timeout:
+        read(devs[module], 3, 4, data)
+        raw.append(twos_comp((data[0] << 4) + (data[1] >> 4), 12))
+        temp.append(twos_comp((data[2] << 4) + (data[3] >> 4), 12))
+        print(raw[-1], temp[-1])
+    print(np.round(np.mean(raw)), np.round(np.mean(temp)))
+    [close(d) for d in devs]
