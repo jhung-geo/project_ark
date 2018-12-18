@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 import serial
 import serial.tools.list_ports
@@ -184,7 +185,7 @@ def _ble_cmd_attclient_find_information(conn, start, end):
 
 def _ble_write_split_packets(conn, tx, p):
     # Split into BLE packets
-    for n in range(len(p[0]) / _BLE_WRITE_MAX_PAYLOAD):
+    for n in range(len(p[0]) // _BLE_WRITE_MAX_PAYLOAD):
         p.append(_ble_cmd_attclient_attribute_write(conn, tx, _bytes_to_ord(p[0][n * _BLE_WRITE_MAX_PAYLOAD : (n + 1) * _BLE_WRITE_MAX_PAYLOAD])))
     # Last packet of leftover bytes
     p.append(_ble_cmd_attclient_attribute_write(conn, tx, _bytes_to_ord(p[0][-(len(p[0]) % _BLE_WRITE_MAX_PAYLOAD):])))
@@ -531,7 +532,6 @@ def _arduino_check(uid):
     if len(r) >= 8:
         if chr(r[-8]) == chr(r[-7]) == 'z':
             v = int(''.join([chr(n) for n in r[-6:]]))
-            print('Arduino found at {}, FW v.{}'.format(ser.port, v))
             nb = _num_i2c_bus(uid)
             return [(ser, ble, v, nb)]
 
@@ -612,13 +612,13 @@ def _ble_check(uid):
                     bytes_left -= 1
                     if bytes_left == 0:
                         if field[0] in [0x02, 0x03]: # 16-bit UUIDs
-                            for i in range((len(field) - 1) / 2):
+                            for i in range((len(field) - 1) // 2):
                                 ad_services.append(field[-1 - i * 2 : -3 - i * 2 : -1])
                         if field[0] in [0x04, 0x05]: # 32-bit UUIDs
-                            for i in range((len(field) - 1) / 4):
+                            for i in range((len(field) - 1) // 4):
                                 ad_services.append(field[-1 - i * 4 : -5 - i * 4 : -1])
                         if field[0] in [0x06, 0x07]: # 128-bit UUIDs
-                            for i in range((len(field) - 1) / 16):
+                            for i in range((len(field) - 1) // 16):
                                 ad_services.append(field[-1 - i * 16 : -17 - i * 16 : -1])
 
             # Check for uart service
@@ -632,7 +632,7 @@ def _ble_check(uid):
     _log('BLE Connect')
     ble_conns = []
     for peripheral in ble_peripherals:
-        ser.write(_ble_cmd_gap_connect_direct(peripheral[0], peripheral[1], 0x3C, 0x4C, 0x64, 0))
+        ser.write(_ble_cmd_gap_connect_direct(peripheral[0], peripheral[1], 8, 76, 100, 0))
         while True:
             if ser.in_waiting >= _BLE_PACKET_HEADER_LENGTH:
                 h = _bytes_to_ord(ser.read(_BLE_PACKET_HEADER_LENGTH))
@@ -751,6 +751,7 @@ def enum(ports=[], baud=115200, addrs=range(8, 120)):
 
     for dev in devs:
         _log('Searching device {}'.format(str(dev)))
+        print('Arduino found at {}{}, FW v.{}'.format(dev[0].port, ' [BLE {}]'.format(dev[1][0]) if dev[1] else '', dev[2]))
         devices += _addr_check(dev, addrs)
 
     if devices == []:
@@ -888,7 +889,7 @@ def write(uid, reg, data):
         _i2c_address(addr))
 
     # Split into Arduino packets
-    for n in range(len(data) / _I2C_WRITE_MAX_PAYLOAD):
+    for n in range(len(data) // _I2C_WRITE_MAX_PAYLOAD):
         # Length 16, repeated write
         hex += '{}{}'.format(
             _i2c_length(_I2C_WRITE_MAX_PAYLOAD + 1),
@@ -997,7 +998,7 @@ if __name__ == '__main__':
         read(devs[module], 3, 4, data)
         raw.append(twos_comp((data[0] << 4) + (data[1] >> 4), 12))
         temp.append(twos_comp((data[2] << 4) + (data[3] >> 4), 12))
-        print(raw[-1], temp[-1])
+        # print(raw[-1], temp[-1])
     print(np.round(np.mean(raw)), np.round(np.mean(temp)))
     [close(d) for d in devs]
 
