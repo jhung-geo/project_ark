@@ -8,11 +8,12 @@
  * with the commandline arduino-mk package (apt-get install arduino-mk)
  */
 void resetAdapter();
-void handleCommand(uint8_t cmd);
+void handleCommand(uint8_t);
 void handleError();
 void handleIdent();
 void handleWireRead();
 void handleDioRead();
+void handleDebug(uint8_t, uint8_t = 1);
 
 /**
  * Can't access error register of TWI/Wire library. Thus no errors
@@ -81,11 +82,6 @@ uint8_t time_stamp[6] = {
 
 #elif defined ADAFRUIT_FEATHER_M0
 
-#include <SoftwareWire.h>
-#include <SPI.h>
-#include <Adafruit_BLE.h>
-#include <Adafruit_BluefruitLE_SPI.h>
-
 #define DIO_PIN_MIN             9
 #define DIO_PIN_MAX             14
 
@@ -93,6 +89,13 @@ uint8_t time_stamp[6] = {
 #define NUM_HW_I2C_BUS          WIRE_INTERFACES_COUNT
 #define NUM_SW_I2C_BUS          0
 #define NUM_I2C_BUS             (NUM_HW_I2C_BUS + NUM_SW_I2C_BUS)
+
+#define BLE_ENABLED
+
+#if defined BLE_ENABLED
+
+#include <Adafruit_BLE.h>
+#include <Adafruit_BluefruitLE_SPI.h>
 
 #define BLE_RESET_ENABLE        1
 #define BLE_MIN_FW_VERSION      "0.6.6"
@@ -104,7 +107,7 @@ Adafruit_BluefruitLE_SPI ble(BLE_SPI_CS, BLE_SPI_IRQ, BLE_SPI_RST);
 
 #define COM_MAIN                ble
 #define COM_MAIN_BEGIN()        BLE_BEGIN(COM_MAIN)
-                                
+
 #define COM_DEBUG               Serial
 #define COM_DEBUG_BEGIN()       SERIAL_BEGIN(COM_DEBUG, 115200)
 
@@ -116,6 +119,22 @@ uint8_t time_stamp[6] = {
   0x30 | /* D: */ 0,
   0x30 | /* D: */ 5
 };
+
+#else // defined BLE_ENABLED
+
+#define COM_MAIN                Serial
+#define COM_MAIN_BEGIN()        SERIAL_BEGIN(COM_MAIN, 115200)
+
+uint8_t time_stamp[6] = {
+  0x30 | /* Y: */ 1,
+  0x30 | /* Y: */ 9,
+  0x30 | /* M: */ 0,
+  0x30 | /* M: */ 1,
+  0x30 | /* D: */ 0,
+  0x30 | /* D: */ 9
+};
+
+#endif // defined BLE_ENABLED
 
 #elif defined ARDUINO_AVR_UNO
 
@@ -139,11 +158,11 @@ uint8_t time_stamp[6] = {
   0x30 | /* D: */ 4
 };
 
-#else
+#else // defined <BOARD_NAME>
 
 #error "Board not supported"
 
-#endif
+#endif // defined <BOARD_NAME>
 
 #define DEBUG
 
@@ -220,68 +239,68 @@ TwoWire **wires;
 
 #if NUM_SW_I2C_BUS > 0
 SoftwareWire swWire(PIN_SWWIRE_SDA, PIN_SWWIRE_SCL, true, false);
-#endif
+#endif // NUM_SW_I2C_BUS > 0
 
 #if NUM_SW_I2C_BUS > 1
 SoftwareWire swWire1(PIN_SWWIRE1_SDA, PIN_SWWIRE1_SCL, true, false);
-#endif
+#endif // NUM_SW_I2C_BUS > 1
 
 #if NUM_SW_I2C_BUS > 2
 SoftwareWire swWire2(PIN_SWWIRE2_SDA, PIN_SWWIRE2_SCL, true, false);
-#endif
+#endif // NUM_SW_I2C_BUS > 2
 
 uint8_t activeWire = 0;
 
 uint8_t wiresSCL[NUM_I2C_BUS] = {
 #if NUM_HW_I2C_BUS > 0
   PIN_WIRE_SCL,
-#endif
+#endif // NUM_HW_I2C_BUS > 0
 
 #if NUM_HW_I2C_BUS > 1
   PIN_WIRE1_SCL,
-#endif
+#endif // NUM_HW_I2C_BUS > 1
 
 #if NUM_HW_I2C_BUS > 2
   PIN_WIRE2_SCL,
-#endif
+#endif // NUM_HW_I2C_BUS > 2
 
 #if NUM_SW_I2C_BUS > 0
   PIN_SWWIRE_SCL,
-#endif
+#endif // NUM_SW_I2C_BUS > 0
 
 #if NUM_SW_I2C_BUS > 1
   PIN_SWWIRE1_SCL,
-#endif
+#endif // NUM_SW_I2C_BUS > 1
 
 #if NUM_SW_I2C_BUS > 2
   PIN_SWWIRE2_SCL,
-#endif
+#endif // NUM_SW_I2C_BUS > 2
 };
 
 uint8_t wiresSDA[NUM_I2C_BUS] = {
 #if NUM_HW_I2C_BUS > 0
   PIN_WIRE_SDA,
-#endif
+#endif // NUM_HW_I2C_BUS > 0
 
 #if NUM_HW_I2C_BUS > 1
   PIN_WIRE1_SDA,
-#endif
+#endif // NUM_HW_I2C_BUS > 1
 
 #if NUM_HW_I2C_BUS > 2
   PIN_WIRE2_SDA,
-#endif
+#endif // NUM_HW_I2C_BUS > 2
 
 #if NUM_SW_I2C_BUS > 0
   PIN_SWWIRE_SDA,
-#endif
+#endif // NUM_SW_I2C_BUS > 0
 
 #if NUM_SW_I2C_BUS > 1
   PIN_SWWIRE1_SDA,
-#endif
+#endif // NUM_SW_I2C_BUS > 1
 
 #if NUM_SW_I2C_BUS > 2
   PIN_SWWIRE2_SDA,
-#endif
+#endif // NUM_SW_I2C_BUS > 2
 };
 
 
@@ -304,48 +323,48 @@ void setup() {
   // Initialize NeoPixel
   np.begin();
   np.show();
-#endif
+#endif // ADAFRUIT_NEOPIXEL_H
 
   // Initialize I2C buses
   wires = new TwoWire*[NUM_I2C_BUS];  
   uint8_t b = 0;
 #if NUM_HW_I2C_BUS > 0
   wires[b++] = &Wire;
-#endif
+#endif // NUM_HW_I2C_BUS > 0
 
 #if NUM_HW_I2C_BUS > 1
   wires[b++] = &Wire1;
-#endif
+#endif // NUM_HW_I2C_BUS > 1
 
 #if NUM_HW_I2C_BUS > 2
   wires[b++] = &Wire2;
-#endif
+#endif // NUM_HW_I2C_BUS > 2
 
 #if NUM_SW_I2C_BUS > 0
   wires[b++] = &swWire;
-#endif
+#endif // NUM_SW_I2C_BUS > 0
 
 #if NUM_SW_I2C_BUS > 1
   wires[b++] = &swWire1;
-#endif
+#endif // NUM_SW_I2C_BUS > 1
 
 #if NUM_SW_I2C_BUS > 2
   wires[b++] = &swWire2;
-#endif
+#endif // NUM_SW_I2C_BUS > 2
 
   // Configure I2C buses
   for (b = 0; b < NUM_I2C_BUS; b++) {
 #if defined ARDUINO_AVR_UNO
-    // Disable internal 5V pullups
+    // Disable internal pullups
     pinMode(wiresSCL[b], INPUT);
     pinMode(wiresSDA[b], INPUT);
-#else
-    // Ensures software I2C lines [2, 7] are high when disconnected (floating), and 
+#else // defined ARDUINO_AVR_UNO
+    // Ensures software I2C lines are high when disconnected (floating), and 
     // hardware I2C lines (SCL, SDA) are low when disconnected (floating) (don't ask how)
     pinMode(wiresSCL[b], INPUT_PULLUP);
     pinMode(wiresSDA[b], INPUT_PULLUP);
-#endif
-    
+#endif // defined ARDUINO_AVR_UNO
+
     wires[b]->begin();
     wires[b]->setClock(I2C_CLK_LIMIT);
   }
@@ -356,8 +375,8 @@ void setup() {
 #if defined DEBUG && defined COM_DEBUG
   // Initialize debug communication
   COM_DEBUG_BEGIN();
-#endif
-  
+#endif // defined DEBUG && defined COM_DEBUG
+
   // Initialize the main communication
   COM_MAIN_BEGIN();
 }
@@ -379,15 +398,8 @@ void loop() {
     // Read and handle data from serial port
     char cmd = COM_MAIN.read();
 
-#if defined DEBUG && defined COM_DEBUG
-    COM_DEBUG.println();
-    COM_DEBUG.print(cmd);
-    COM_DEBUG.print(" [0x");
-    if (cmd <= 0xF) COM_DEBUG.print(F("0"));
-    COM_DEBUG.print(cmd, HEX);
-    COM_DEBUG.print("] ");
-#endif
-    
+    handleDebug((uint8_t)cmd, 1);
+
     if (cmd >= 0) {
       handleCommand(cmd);
     }
@@ -420,14 +432,8 @@ void handleCommand(uint8_t cmd) {
       }
       read_buf[0] = COM_MAIN.read();
 
-#if defined DEBUG && defined COM_DEBUG
-      COM_DEBUG.print((char)read_buf[0]);
-      COM_DEBUG.print(" [0x");
-      if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
-      COM_DEBUG.print((char)read_buf[0], HEX);
-      COM_DEBUG.print("] ");
-#endif
-      
+      handleDebug(read_buf[0]);
+
       if (read_buf[0] == CMD_HANDSHAKE) {
         read_buf[0] = 0x7A;
         read_buf[1] = 0x7A;
@@ -469,14 +475,8 @@ void handleCommand(uint8_t cmd) {
       }
       read_buf[0] = COM_MAIN.read();
 
-#if defined DEBUG && defined COM_DEBUG
-      COM_DEBUG.print((char)read_buf[0]);
-      COM_DEBUG.print(" [0x");
-      if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
-      COM_DEBUG.print((char)read_buf[0], HEX);
-      COM_DEBUG.print("] ");
-#endif
-      
+      handleDebug(read_buf[0]);
+
       if (read_buf[0] < NUM_I2C_BUS) {
         if (activeWire != read_buf[0]) {
           activeWire = read_buf[0];
@@ -500,14 +500,8 @@ void handleCommand(uint8_t cmd) {
       }
       read_buf[0] = COM_MAIN.read();
 
-#if defined DEBUG && defined COM_DEBUG
-      COM_DEBUG.print((char)read_buf[0]);
-      COM_DEBUG.print(" [0x");
-      if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
-      COM_DEBUG.print((char)read_buf[0], HEX);
-      COM_DEBUG.print("] ");
-#endif
-      
+      handleDebug(read_buf[0]);
+
       wires[activeWire]->endTransmission();
       wires[activeWire]->setClock(min(read_buf[0] * 10000, I2C_CLK_LIMIT));
       resetAdapter();
@@ -537,14 +531,8 @@ void handleCommand(uint8_t cmd) {
       }
       read_buf[0] = COM_MAIN.read();
 
-#if defined DEBUG && defined COM_DEBUG
-      COM_DEBUG.print((char)read_buf[0]);
-      COM_DEBUG.print(" [0x");
-      if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
-      COM_DEBUG.print((char)read_buf[0], HEX);
-      COM_DEBUG.print("] ");
-#endif
-      
+      handleDebug(read_buf[0]);
+
       address = read_buf[0];
       break;
 
@@ -560,14 +548,8 @@ void handleCommand(uint8_t cmd) {
       }
       read_buf[0] = COM_MAIN.read();
 
-#if defined DEBUG && defined COM_DEBUG
-      COM_DEBUG.print((char)read_buf[0]);
-      COM_DEBUG.print(" [0x");
-      if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
-      COM_DEBUG.print((char)read_buf[0], HEX);
-      COM_DEBUG.print("] ");
-#endif
-      
+      handleDebug(read_buf[0]);
+
       if (read_buf[0] > 32) {
         state = STATE_ERROR;
         error = ERROR_LENGTH;
@@ -582,14 +564,14 @@ void handleCommand(uint8_t cmd) {
       // Flag a disconnected (floating) hardware I2C bus (SCL, SDA) 
       // by checking if both lines are LOW; if so, don't even bother trying
       // to begin a transmission
-      // Disconnected (floating) software I2C buses will not trip this check, 
+      // Disconnected (floating) software I2C buses will not trip this check,
       // but that's okay, we'll catch them later
       if (digitalRead(wiresSCL[activeWire]) == LOW && digitalRead(wiresSDA[activeWire]) == LOW) {
         error = ERROR_SENDDATA;
       } else {
         wires[activeWire]->beginTransmission(address);
       }
-  
+
       // In the WRITE state, accept as many data bytes as specified by a
       // previous LENGTH command, writing them to the target slave address
       for (uint8_t i = 0; i < length; i++) {
@@ -602,14 +584,8 @@ void handleCommand(uint8_t cmd) {
         }
         read_buf[0] = COM_MAIN.read();
 
-#if defined DEBUG && defined COM_DEBUG
-        COM_DEBUG.print((char)read_buf[0]);
-        COM_DEBUG.print(" [0x");
-        if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
-        COM_DEBUG.print((char)read_buf[0], HEX);
-        COM_DEBUG.print("] ");
-#endif
-        
+        handleDebug(read_buf[0]);
+
         if (wires[activeWire]->write(read_buf[0]) == 0) {
           state = STATE_ERROR;
           error = ERROR_WRITEDATA;
@@ -652,7 +628,7 @@ void handleCommand(uint8_t cmd) {
     case CMD_GET_LENGTH:
       COM_MAIN.write(length);
       break;
-      
+
     case CMD_DIO_PIN:
       // In the DIO_PIN state, the passed byte indicates the pin to operate on
       while (!COM_MAIN.available()) {
@@ -664,14 +640,8 @@ void handleCommand(uint8_t cmd) {
       }
       read_buf[0] = COM_MAIN.read();
 
-#if defined DEBUG && defined COM_DEBUG
-      COM_DEBUG.print((char)read_buf[0]);
-      COM_DEBUG.print(" [0x");
-      if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
-      COM_DEBUG.print((char)read_buf[0], HEX);
-      COM_DEBUG.print("] ");
-#endif
-      
+      handleDebug(read_buf[0]);
+
       if (read_buf[0] > DIO_PIN_MIN && read_buf[0] < DIO_PIN_MAX) {
         dio_pin = read_buf[0];
       } else {
@@ -691,29 +661,23 @@ void handleCommand(uint8_t cmd) {
       }
       read_buf[0] = COM_MAIN.read();
 
-#if defined DEBUG && defined COM_DEBUG
-      COM_DEBUG.print((char)read_buf[0]);
-      COM_DEBUG.print(" [0x");
-      if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
-      COM_DEBUG.print((char)read_buf[0], HEX);
-      COM_DEBUG.print("] ");
-#endif
-      
+      handleDebug(read_buf[0]);
+
       if (dio_pin > DIO_PIN_MIN && dio_pin < DIO_PIN_MAX) {
         dio_mode = read_buf[0];
         switch (dio_mode) {
           case 0:
             pinMode(dio_pin, INPUT);
             break;
-            
+
           case 1:
             pinMode(dio_pin, OUTPUT);
             break;
-            
+
           case 2:
             pinMode(dio_pin, INPUT_PULLUP);
             break;
-  
+
           default:
             state = STATE_ERROR;
             error = ERROR_DIO;
@@ -737,14 +701,8 @@ void handleCommand(uint8_t cmd) {
       }
       read_buf[0] = COM_MAIN.read();
 
-#if defined DEBUG && defined COM_DEBUG
-      COM_DEBUG.print((char)read_buf[0]);
-      COM_DEBUG.print(" [0x");
-      if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
-      COM_DEBUG.print((char)read_buf[0], HEX);
-      COM_DEBUG.print("] ");
-#endif
-      
+      handleDebug(read_buf[0]);
+
       if (dio_pin > DIO_PIN_MIN && dio_pin < DIO_PIN_MAX) {
         digitalWrite(dio_pin, read_buf[0] == 0 ? LOW : HIGH);
       }
@@ -762,19 +720,12 @@ void handleCommand(uint8_t cmd) {
         }
         read_buf[i] = COM_MAIN.read();
 
-#if defined DEBUG && defined COM_DEBUG
-        COM_DEBUG.print((char)read_buf[0]);
-        COM_DEBUG.print(" [0x");
-        if (read_buf[0] <= 0xF) COM_DEBUG.print(F("0"));
-        COM_DEBUG.print((char)read_buf[0], HEX);
-        COM_DEBUG.print("] ");
-#endif
-        
+        handleDebug(read_buf[0]);
       }
 #ifdef ADAFRUIT_NEOPIXEL_H
       np.setPixelColor(0, read_buf[0], read_buf[1], read_buf[2]);
       np.show();
-#endif
+#endif // ADAFRUIT_NEOPIXEL_H
       break;
 
     default:
@@ -839,4 +790,15 @@ void handleDioRead() {
     COM_MAIN.write(level == LOW ? 0 : 1);
     COM_MAIN.flush();
   }
+}
+
+void handleDebug(uint8_t c, uint8_t newline) {
+#if defined DEBUG && defined COM_DEBUG
+  if (newline) COM_DEBUG.println();
+  COM_DEBUG.print((char)c);
+  COM_DEBUG.print(" [0x");
+  if (c <= 0xF) COM_DEBUG.print(F("0"));
+  COM_DEBUG.print((char)c, HEX);
+  COM_DEBUG.print("] ");
+#endif // defined DEBUG && defined COM_DEBUG
 }
