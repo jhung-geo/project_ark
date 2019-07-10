@@ -4,6 +4,10 @@ from __future__ import print_function
 import serial
 import serial.tools.list_ports
 from six.moves import range
+try:
+    import termios
+except ModuleNotFoundError:
+    pass
 import time
 
 STATUS_OK = 0
@@ -744,7 +748,7 @@ def enum(ports=[], baud=115200, addrs=range(8, 120)):
                 d = _arduino_check((ser, None))
             devs += d
 
-        except (OSError, serial.SerialException):
+        except (OSError, serial.SerialException, termios.error):
             pass
 
     _log(devs)
@@ -857,7 +861,7 @@ def read(uid, reg, length, data):
             return STATUS_ERROR, len(r)
 
         rdata = []
-        if read(uid, None, length - _I2C_READ_MAX_PAYLOAD, rdata) == (STATUS_OK, length - _I2C_READ_MAX_PAYLOAD):
+        if read(uid, reg + _I2C_READ_MAX_PAYLOAD, length - _I2C_READ_MAX_PAYLOAD, rdata) == (STATUS_OK, length - _I2C_READ_MAX_PAYLOAD):
             data[:] = r[-length:] + rdata
             return STATUS_OK, len(data)
 

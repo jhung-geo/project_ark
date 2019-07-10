@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='arduino_io',
-    version='0.0.9',
+    version='0.0.10',
     description='A Python interface to the Arduino I2C-to-USB bridge',
     license='',
     packages=['arduino_io'],
