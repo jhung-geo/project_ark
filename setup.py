@@ -10,6 +10,7 @@ setup(
     author_email='jerry.hung@nextinput.com',
     url='https://bitbucket.org/nextinput_sw/project_ark',
     install_requires=[
-        'pyserial'
+        'pyserial',
+        'six'
     ]
 )
