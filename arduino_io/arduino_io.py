@@ -7,7 +7,9 @@ from six.moves import range
 try:
     import termios
 except ModuleNotFoundError:
-    pass
+    class termios():
+        class error(BaseException):
+            pass
 import time
 
 STATUS_OK = 0

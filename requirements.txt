@@ -1,3 +1,2 @@
 pyserial==3.4
-progressbar2==3.37.0
 setuptools==36.0.1
