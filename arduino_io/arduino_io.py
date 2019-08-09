@@ -725,7 +725,7 @@ def enum(ports=[], baud=115200, addrs=range(8, 120)):
     devices:  A list of connected device unique identifiers.
     """
     devices = []
-    if len(ports) is 0:
+    if len(ports) == 0:
         ports = [p.device for p in serial.tools.list_ports.comports()]
 
     devs = []
