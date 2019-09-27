@@ -11,6 +11,5 @@ setup(
     url='https://bitbucket.org/nextinput_sw/project_ark',
     install_requires=[
         'pyserial',
-        'six'
     ]
 )
