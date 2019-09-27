@@ -3,7 +3,6 @@ from __future__ import division
 from __future__ import print_function
 import serial
 import serial.tools.list_ports
-from six.moves import range
 try:
     import termios
 except ModuleNotFoundError:
