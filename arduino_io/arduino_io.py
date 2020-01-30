@@ -1,6 +1,4 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+import logging
 import serial
 import serial.tools.list_ports
 try:
@@ -10,6 +8,13 @@ except ModuleNotFoundError:
         class error(BaseException):
             pass
 import time
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
+loghnd = logging.StreamHandler()
+logfmt = logging.Formatter('%(asctime)s.%(msecs)03d [%(name)s:%(lineno)-5d] %(levelname).1s: %(message)s', datefmt='%H:%M:%S')
+loghnd.setFormatter(logfmt)
+logger.addHandler(loghnd)
 
 STATUS_OK = 0
 STATUS_ERROR = 1
@@ -58,16 +63,6 @@ ble_uuid_uart_service = [0x6e, 0x40, 0x00, 0x01, 0xb5, 0xa3, 0xf3, 0x93, 0xe0, 0
 ble_uuid_service = [0x28, 0x00]
 ble_uuid_tx = [0x6e, 0x40, 0x00, 0x02, 0xb5, 0xa3, 0xf3, 0x93, 0xe0, 0xa9, 0xe5, 0x0e, 0x24, 0xdc, 0xca, 0x9e]
 ble_uuid_rx = [0x6e, 0x40, 0x00, 0x03, 0xb5, 0xa3, 0xf3, 0x93, 0xe0, 0xa9, 0xe5, 0x0e, 0x24, 0xdc, 0xca, 0x9e]
-
-_DEBUG = False
-
-def debug(flag):
-    global _DEBUG
-    _DEBUG = True if flag else False
-
-def _log(s):
-    if _DEBUG:
-        print(s)
 
 # Convert bytes to string
 def _bytes_to_str(b):
@@ -212,7 +207,7 @@ def _ble_write_confirm(ser):
                 break
 
 def _ble_read(ser, conn, rx):
-    _log('Writing {}'.format(' '.join(['{:02X}'.format(b) for b in _ble_cmd_attclient_read_long(conn, rx)])))
+    logger.debug(f'Writing {" ".join([f"{b:02X}" for b in _ble_cmd_attclient_read_long(conn, rx)])}')
     ser.write(_ble_cmd_attclient_read_long(conn, rx))
     r = []
     while True:
@@ -220,10 +215,10 @@ def _ble_read(ser, conn, rx):
             h = _bytes_to_ord(ser.read(_BLE_PACKET_HEADER_LENGTH))
             p = _bytes_to_ord(ser.read(_ble_payload_length(h)))
             if _ble_packet_ident(h) == _BLE_ATTRIBUTE_VALUE:
-                _log('BLE_ATTRIBUTE_VALUE {}'.format(str(p)))
+                logger.debug(f'BLE_ATTRIBUTE_VALUE {str(p)}')
                 r += p
             elif _ble_packet_ident(h) == _BLE_PROCEDURE_COMPLETED:
-                _log('BLE_PROCEDURE_COMPLETED {}'.format(str(p)))
+                logger.debug(f'BLE_PROCEDURE_COMPLETED {str(p)}')
                 return r[5:]
 
 
@@ -280,7 +275,7 @@ def i2c_clock(uid, clock):
     # addr = uid[2]
 
     if clock > 100 or clock <= 0:
-        print('I2C clock {} out of range'.format(clock))
+        logger.warning(f'I2C clock {clock} out of range')
         return STATUS_ERROR
 
     hex = '{}{}{:02X}'.format(
@@ -375,7 +370,7 @@ def dio_mode(uid, pin, mode):
     _dio_pin(uid, pin)
 
     if mode < 0 or mode > 2:
-        print('Digital IO mode {} out of range'.format(mode))
+        logger.warning(f'Digital IO mode {mode} out of range')
         return STATUS_ERROR
 
     hex = '{}{:02X}'.format(
@@ -438,7 +433,7 @@ def dio_write(uid, pin, level):
     _dio_pin(uid, pin)
 
     if level < 0 or level > 1:
-        print('Digital IO level {} out of range'.format(level))
+        logger.warning(f'Digital IO level {level} out of range')
         return STATUS_ERROR
 
     hex = '{}{:02X}'.format(
@@ -523,7 +518,7 @@ def _arduino_check(uid):
     for t in range(5):
         # Write packets
         for o in out:
-            _log('Writing {}'.format(' '.join(['{:02X}'.format(b) for b in bytearray(o)])))
+            logger.debug(f'Writing {" ".join([f"{b:02X}" for b in bytearray(o)])}')
             ser.write(o)
             if ble:
                 _ble_write_confirm(ser)
@@ -533,7 +528,7 @@ def _arduino_check(uid):
         else:
             r = _bytes_to_ord(ser.read(8))
 
-        _log('Read back {}'.format(' '.join(['{:02X}'.format(b) for b in r])))
+        logger.debug(f'Read back {" ".join([f"{b:02X}" for b in r])}')
 
         if len(r) >= 8:
             break
@@ -560,49 +555,49 @@ def _ble_check(uid):
 
     devices = []
 
-    # _log('BLE Reset')
+    # logger.debug('BLE Reset')
     # ser.write(_ble_cmd_system_reset(0))
 
-    _log('BLE Get Info')
+    logger.debug('BLE Get Info')
     ser.write(_ble_cmd_system_get_info())
     h = _bytes_to_ord(ser.read(_BLE_PACKET_HEADER_LENGTH))
     if not h:
-        _log('BLE No Response')
+        logger.debug('BLE No Response')
         return devices
     p = _bytes_to_ord(ser.read(_ble_payload_length(h)))
     if _ble_packet_ident(h) != _BLE_RSP_SYSTEM_GET_INFO:
-        _log('BLE Unknown Response')
+        logger.debug('BLE Unknown Response')
         return devices
 
-    _log('BLE Disconnect')
+    logger.debug('BLE Disconnect')
     ser.write(_ble_cmd_connection_disconnect(0))
     h = _bytes_to_ord(ser.read(_BLE_PACKET_HEADER_LENGTH))
     p = _bytes_to_ord(ser.read(_ble_payload_length(h)))
 
-    _log('BLE Stop Advertising')
+    logger.debug('BLE Stop Advertising')
     ser.write(_ble_cmd_gap_set_mode(0, 0))
     h = _bytes_to_ord(ser.read(_BLE_PACKET_HEADER_LENGTH))
     p = _bytes_to_ord(ser.read(_ble_payload_length(h)))
 
-    _log('BLE Stop Scanning')
+    logger.debug('BLE Stop Scanning')
     ser.write(_ble_cmd_gap_end_procedure())
     h = _bytes_to_ord(ser.read(_BLE_PACKET_HEADER_LENGTH))
     p = _bytes_to_ord(ser.read(_ble_payload_length(h)))
 
-    _log('BLE Set Scan Parameters')
+    logger.debug('BLE Set Scan Parameters')
     ser.write(_ble_cmd_gap_set_scan_parameters(200, 200, 1))
     h = _bytes_to_ord(ser.read(_BLE_PACKET_HEADER_LENGTH))
     p = _bytes_to_ord(ser.read(_ble_payload_length(h)))
 
-    _log('BLE Start Scan')
+    logger.debug('BLE Start Scan')
     ser.write(_ble_cmd_gap_discover(1))
 
     time.sleep(0.5)
 
-    _log('BLE Stop Scan')
+    logger.debug('BLE Stop Scan')
     ser.write(_ble_cmd_gap_end_procedure())
 
-    _log('BLE Get Scan Responses')
+    logger.debug('BLE Get Scan Responses')
     ble_peripherals = []
     while ser.in_waiting >= _BLE_PACKET_HEADER_LENGTH:
         h = _bytes_to_ord(ser.read(_BLE_PACKET_HEADER_LENGTH))
@@ -635,10 +630,10 @@ def _ble_check(uid):
                 sender = p[2:8]
                 addr_type = p[8]
                 if (sender, addr_type) not in ble_peripherals:
-                    _log('BLE UART Service Found')
+                    logger.debug('BLE UART Service Found')
                     ble_peripherals.append((sender, addr_type))
 
-    _log('BLE Connect')
+    logger.debug('BLE Connect')
     ble_conns = []
     for peripheral in ble_peripherals:
         ser.write(_ble_cmd_gap_connect_direct(peripheral[0], peripheral[1], 8, 76, 100, 0))
@@ -651,7 +646,7 @@ def _ble_check(uid):
                         ble_conns.append([p[0]])
                         break
 
-    _log('BLE Get Handle Range')
+    logger.debug('BLE Get Handle Range')
     for c in range(len(ble_conns)):
         ser.write(_ble_cmd_attclient_read_by_group_type(ble_conns[c][0], 0x0001, 0xFFFF, list(reversed(ble_uuid_service))))
         while True:
@@ -665,7 +660,7 @@ def _ble_check(uid):
                 elif _ble_packet_ident(h) == _BLE_PROCEDURE_COMPLETED:
                     break
 
-    _log('BLE Get Attribute Handles')
+    logger.debug('BLE Get Attribute Handles')
     for c in range(len(ble_conns)):
         ser.write(_ble_cmd_attclient_find_information(ble_conns[c][0], ble_conns[c][1], ble_conns[c][2]))
         while True:
@@ -681,7 +676,7 @@ def _ble_check(uid):
                 elif _ble_packet_ident(h) == _BLE_PROCEDURE_COMPLETED:
                     break
 
-    _log('BLE Arduino Check')
+    logger.debug('BLE Arduino Check')
     for c in range(len(ble_conns)):
         devices += _arduino_check((ser, (ble_conns[c][0], ble_conns[c][3], ble_conns[c][4])))
 
@@ -700,7 +695,7 @@ def _addr_check(uid, addrs):
             status, num_write = write((uid, b, addr), 0xDD, [0x00])
             if status == STATUS_OK:
                 devices.append((uid, b, addr))
-                print('Device found on bus {} @ I2C address 0x{:02X}'.format(b, addr))
+                logger.info(f'Device found on bus {b} @ I2C address 0x{addr:02X}')
 
     return devices
 
@@ -745,7 +740,7 @@ def enum(ports=[], baud=115200, addrs=range(8, 120)):
             ser.reset_input_buffer()
             ser.reset_output_buffer()
 
-            _log('Checking port {}'.format(port))
+            logger.debug(f'Checking port {port}')
             d = _ble_check((ser,))
             if len(d) == 0:
                 ser.reset_input_buffer()
@@ -756,15 +751,15 @@ def enum(ports=[], baud=115200, addrs=range(8, 120)):
         except (OSError, serial.SerialException, termios.error):
             pass
 
-    _log(devs)
+    logger.debug(f'{devs}')
 
     for dev in devs:
-        _log('Searching device {}'.format(str(dev)))
-        print('Arduino found at {}{}, FW v.{}'.format(dev[0].port, ' [BLE {}]'.format(dev[1][0]) if dev[1] else '', dev[2]))
+        logger.debug(f'Searching device {str(dev)}')
+        logger.info(f'Arduino found at {dev[0].port}{f" [BLE {dev[1][0]}]" if dev[1] else ""}, FW v.{dev[2]}')
         devices += _addr_check(dev, addrs)
 
     if devices == []:
-        print('\nDevice enumeration failed, please check connection and/or device(s)\n')
+        logger.info('Device enumeration failed, please check connection and/or device(s)')
 
     return devices
 
@@ -818,7 +813,7 @@ def read(uid, reg, length, data):
 
         # Write packets
         for o in out:
-            _log('Writing {}'.format(' '.join(['{:02X}'.format(b) for b in bytearray(o)])))
+            logger.debug(f'Writing {" ".join([f"{b:02X}" for b in bytearray(o)])}')
             ser.write(o)
             if ble:
                 _ble_write_confirm(ser)
@@ -828,10 +823,10 @@ def read(uid, reg, length, data):
         else:
             r = _bytes_to_ord(ser.read(length))
 
-        _log('Read back {}'.format(' '.join(['{:02X}'.format(b) for b in r])))
+        logger.debug(f'Read back {" ".join([f"{b:02X}" for b in r])}')
 
         if len(r) < length:
-            _log('Received {}, expected {}'.format(len(r), length))
+            logger.debug(f'Received {len(r)}, expected {length}')
             return STATUS_ERROR, len(r)
 
         data[:] = r[-length:]
@@ -849,7 +844,7 @@ def read(uid, reg, length, data):
 
         # Write packets
         for o in out:
-            _log('Writing {}'.format(' '.join(['{:02X}'.format(b) for b in bytearray(o)])))
+            logger.debug(f'Writing {" ".join([f"{b:02X}" for b in bytearray(o)])}')
             ser.write(o)
             if ble:
                 _ble_write_confirm(ser)
@@ -859,10 +854,10 @@ def read(uid, reg, length, data):
         else:
             r = _bytes_to_ord(ser.read(_I2C_READ_MAX_PAYLOAD))
 
-        _log('Read back {}'.format(' '.join(['{:02X}'.format(b) for b in r])))
+        logger.debug(f'Read back {" ".join([f"{b:02X}" for b in r])}')
 
         if len(r) < _I2C_READ_MAX_PAYLOAD:
-            _log('Received {}, expected {}'.format(len(r), _I2C_READ_MAX_PAYLOAD))
+            logger.debug(f'Received {len(r)}, expected {_I2C_READ_MAX_PAYLOAD}')
             return STATUS_ERROR, len(r)
 
         rdata = []
@@ -924,7 +919,7 @@ def write(uid, reg, data):
 
     # Write packets
     for o in out:
-        _log('Writing {}'.format(' '.join(['{:02X}'.format(b) for b in bytearray(o)])))
+        logger.debug(f'Writing {" ".join([f"{b:02X}" for b in bytearray(o)])}')
         ser.write(o)
         if ble:
             _ble_write_confirm(ser)
@@ -934,7 +929,7 @@ def write(uid, reg, data):
     else:
         r = _bytes_to_ord(ser.read(1))
 
-    _log('Read back {}'.format(' '.join(['{:02X}'.format(b) for b in r])))
+    logger.debug(f'Read back {" ".join([f"{b:02X}" for b in r])}')
 
     if len(r) > 0 and r[-1] == 5:
         return STATUS_OK, len(data)
@@ -947,7 +942,7 @@ def close(uid):
     ble = uid[0][1]
 
     if ble:
-        _log('BLE Disconnect')
+        logger.debug('BLE Disconnect')
         ser.write(_ble_cmd_connection_disconnect(0))
         h = _bytes_to_ord(ser.read(_BLE_PACKET_HEADER_LENGTH))
         p = _bytes_to_ord(ser.read(_ble_payload_length(h)))
@@ -969,6 +964,8 @@ def close(uid):
 if __name__ == '__main__':
     import numpy as np
 
+    logger.setLevel(logging.INFO)
+
     def twos_comp(val, bits):
         if (val & (1 << (bits - 1))) != 0:
             val -= (1 << bits)
@@ -989,13 +986,11 @@ if __name__ == '__main__':
     time.sleep(0.01)
     i2c_clock(devs[-1], 20)
     read(devs[module], 8, 1, data)
-    print(data)
     i2c_clock(devs[-1], 30)
     write(devs[module], 11, [preload << 3])
     time.sleep(0.01)
     i2c_clock(devs[-1], 100)
     read(devs[module], 11, 1, data)
-    print(data)
     write(devs[module], 0, [0x9B, (gain << 4) + 0x05])
     time.sleep(0.01)
     print()
