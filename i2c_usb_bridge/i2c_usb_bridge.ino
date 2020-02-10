@@ -325,6 +325,9 @@ void setup() {
   np.show();
 #endif // ADAFRUIT_NEOPIXEL_H
 
+  // Enable 1.8V
+  analogWrite(A0, 2235);
+  
   // Initialize I2C buses
   wires = new TwoWire*[NUM_I2C_BUS];  
   uint8_t b = 0;
