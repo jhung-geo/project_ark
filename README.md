@@ -51,9 +51,16 @@ In addition to the main hardware I2C bus (SCL/SDA), the Adafruit Metro M4 Expres
     1       A5      A4
     2       SCK     MOSI
 
-To enable these additional hardware I2C buses, the Arduino IDE must be targeting the board:
+Meanwhile, the Adafruit Feather M4 Express exposes an additional one hardware I2C bus:
+
+    Bus     SCL     SDA
+    -------------------
+    1       A3      A2
+
+To enable these additional hardware I2C buses, the Arduino IDE must be targeting the NI flavors of each board:
 
     Adafruit Metro M4 NI =^._.^= ∫ (SAMD51)
+    Adafruit Feather M4 Express NI =^._.^= ∫ (SAMD51)
 
 You can also control the Arduino digital GPIOs with the following commands:
 
