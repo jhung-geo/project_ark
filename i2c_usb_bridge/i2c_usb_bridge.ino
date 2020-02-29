@@ -80,6 +80,35 @@ uint8_t time_stamp[6] = {
   0x30 | /* D: */ 5
 };
 
+#elif defined ADAFRUIT_FEATHER_M4_EXPRESS
+
+#include <SoftwareWire.h>
+#include <Adafruit_NeoPixel.h>
+
+#define DIO_PIN_MIN             9
+#define DIO_PIN_MAX             13
+
+#define I2C_CLK_LIMIT           1000000
+#define NUM_HW_I2C_BUS          WIRE_INTERFACES_COUNT
+#define NUM_SW_I2C_BUS          0
+#define NUM_I2C_BUS             (NUM_HW_I2C_BUS + NUM_SW_I2C_BUS)
+
+#define NUM_NEOPIXEL            1
+#define PIN_NEOPIXEL            8
+Adafruit_NeoPixel np = Adafruit_NeoPixel(NUM_NEOPIXEL, PIN_NEOPIXEL);
+
+#define COM_MAIN                Serial
+#define COM_MAIN_BEGIN()        SERIAL_BEGIN(COM_MAIN, 115200)
+
+uint8_t time_stamp[6] = {
+  0x30 | /* Y: */ 2,
+  0x30 | /* Y: */ 0,
+  0x30 | /* M: */ 0,
+  0x30 | /* M: */ 2,
+  0x30 | /* D: */ 2,
+  0x30 | /* D: */ 8
+};
+
 #elif defined ADAFRUIT_FEATHER_M0
 
 #define DIO_PIN_MIN             9
