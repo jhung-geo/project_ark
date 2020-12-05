@@ -5,12 +5,20 @@
 # You can specify a custom docker image from Docker Hub as your build environment.
 image: python:3.6.9
 
+options:
+  docker:  true
+  size: 2x
+
 clone:
   depth: full              # SonarCloud scanner needs the full history to assign issues properly
 
 pipelines:
   default:
-    - step:        
+    - step:
+        caches:
+          - sonar
+        services:
+          - docker
         script: # Modify the commands below to build your repository.
           #- pip install -r requirements.txt
           #- pip install flake8
@@ -18,3 +26,10 @@ pipelines:
           #- flake8 arduino_io/arduino_io.py
           - pipe: sonarsource/sonarcloud-scan:1.2.0
           - pipe: sonarsource/sonarcloud-quality-gate:0.1.4
+
+definitions:
+  caches:
+    sonar: ~/.sonar/cache
+  services:
+    docker:
+      memory:  4096
