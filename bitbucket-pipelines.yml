@@ -10,8 +10,12 @@ pipelines:
     - step:
         caches:
           - pip
+        clone:
+          depth:  full
         script: # Modify the commands below to build your repository.
           - pip install -r requirements.txt
           - pip install flake8
           # Use Pyinstaller to check syntax
           - flake8 arduino_io/arduino_io.py
+          - pipe: sonarsource/sonarcloud-scan:1.2.0
+          - pipe: sonarsource/sonarcloud-quality-gate:0.1.4
