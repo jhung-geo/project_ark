@@ -5,17 +5,24 @@
 # You can specify a custom docker image from Docker Hub as your build environment.
 image: python:3.6.9
 
-pipelines:
-  default:
-    - step:
-        caches:
-          - pip
-        clone:
-          depth:  full
-        script: # Modify the commands below to build your repository.
-          - pip install -r requirements.txt
-          - pip install flake8
-          # Use Pyinstaller to check syntax
-          - flake8 arduino_io/arduino_io.py
-          - pipe: sonarsource/sonarcloud-scan:1.2.0
-          - pipe: sonarsource/sonarcloud-quality-gate:0.1.4
+clone:
+  depth: full              # SonarCloud scanner needs the full history to assign issues properly
+
+definitions:
+  caches:
+    sonar: ~/.sonar/cache  # Caching SonarCloud artifacts will speed up your build
+  steps:
+    - step: &build-test-sonarcloud
+      name: Build, test and analyze on SonarCloud
+      caches:        
+        - sonar
+      script:
+        - pipe: sonarsource/sonarcloud-scan:1.2.0
+    - step: &check-quality-gate-sonarcloud
+      name: Check the Quality Gate on SonarCloud
+      script:
+        - pipe: sonarsource/sonarcloud-quality-gate:0.1.4
+
+pipelines:                 # More info here: https://confluence.atlassian.com/bitbucket/configure-bitbucket-pipelines-yml-792298910.html
+      - step: *build-test-sonarcloud
+      - step: *check-quality-gate-sonarcloud
