@@ -25,5 +25,5 @@ definitions:
 
 pipelines:                 # More info here: https://confluence.atlassian.com/bitbucket/configure-bitbucket-pipelines-yml-792298910.html
   default:
-      - step: *build-test-sonarcloud
-      - step: *check-quality-gate-sonarcloud
+      - pipe: sonarsource/sonarcloud-scan:1.2.0
+      - pipe: sonarsource/sonarcloud-quality-gate:0.1.4
