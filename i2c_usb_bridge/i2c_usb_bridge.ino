@@ -225,6 +225,10 @@ uint8_t time_stamp[6] = {
 #define CMD_DIO_READ            '<'
 #define CMD_DIO_WRITE           '>'
 
+// Switch Operation
+#define CMD_SWITCH              's'
+#define CMD_ADC                 'c'
+
 // NeoPixel operation
 #define CMD_NP_COLOR            'X'
 
@@ -496,6 +500,25 @@ void handleCommand(uint8_t cmd) {
       COM_MAIN.write(NUM_I2C_BUS);
       break;
 
+    case CMD_SWITCH:
+      while (!COM_MAIN.available()) {
+        delay(1);
+        if (millis() - t0 > 100) {
+          state = STATE_INIT;
+          return;
+        }
+      }
+      // Read the sensor index to switch too
+      read_buf[0] = COM_MAIN.read();
+      // TODO: activate right GPO to set Multiplexers accordingly
+      break;
+    
+    case CMD_ADC:
+      *(short *)read_buf = (short)analogReadDiff(A2, A3);
+      COM_MAIN.write(read_buf, 2);
+      break;
+      
+    
     case CMD_I2C_BUS:
       // In state BUS, the passed byte denotes the I2C bus to activate
       while (!COM_MAIN.available()) {
