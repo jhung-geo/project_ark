@@ -278,7 +278,7 @@ uint8_t time_stamp[6] = {
 #define GPIONE 11
 #define GPIOD  12
 
-uint8_t sensor_map[15][7] = 
+uint8_t sensor_map[15][4] = 
 {
   {0,0,0,0},
   {0,0,1,0},
