@@ -26,6 +26,7 @@ _DIO_PIN = '44'
 _DIO_MODE = '4D'
 _DIO_READ = '3C'
 _DIO_WRITE = '3E'
+_ANALOG_READ = '63'
 
 DIO_MODE_INPUT = 0
 DIO_MODE_OUTPUT = 1
@@ -454,7 +455,28 @@ def dio_write(uid, pin, level):
     return STATUS_OK
 
 
+def analog_read(uid):
+    ser = uid[0]
+    ble = uid[1]
 
+    hex = '{}'.format(
+        _ANALOG_READ)
+
+    out = [_hex_to_bytes(hex)]
+
+    # Write packets
+    for o in out:
+        ser.write(o)
+
+    r = _bytes_to_ord(ser.read(2))
+    
+    print(r)
+    value = r[1] << 8
+    value += r[0]
+    if(value & 0x8000):
+        value |= (-1 & ~0xFFFF)
+    
+    return value
 
 
 
@@ -700,7 +722,55 @@ def _addr_check(uid, addrs):
     return devices
 
 
+def enum_ports(ports=[], baud=115200, addrs=range(8, 120)):
+    """
+    Enumerates connected devices
 
+    Initializes the communication bridge first, if necessary.
+    Stores the identification data for each device into a
+    protocol-dependent representation.
+
+    Args:
+    ports:    A list of serial ports to probe. If empty, this function
+              will probe all available ports.
+    baud:     The serial port baud rate.
+    addrs:    A list of I2C slave addresses to probe.
+
+    Returns:
+    devices:  A list of connected device unique identifiers.
+    """
+    devices = []
+    if len(ports) == 0:
+        ports = [p.device for p in serial.tools.list_ports.comports()]
+
+    devs = []
+    for port in ports:
+        try:
+            ser = serial.Serial(port)
+            ser.baudrate = baud
+            ser.write_timeout = 0
+            ser.timeout = 1
+
+            while not ser.isOpen():
+                pass
+
+            ser.reset_input_buffer()
+            ser.reset_output_buffer()
+
+            logger.debug(f'Checking port {port}')
+
+            d = _ble_check((ser,))
+            if len(d) == 0:
+                ser.reset_input_buffer()
+                ser.reset_output_buffer()
+                d = _arduino_check((ser, None))
+            devs += d
+
+        except (OSError, serial.SerialException, termios.error) as e:
+            print("Exception caught")
+            print(e)
+            pass
+    return devs
 
 
 

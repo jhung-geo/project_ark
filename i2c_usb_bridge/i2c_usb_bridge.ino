@@ -228,6 +228,7 @@ uint8_t time_stamp[6] = {
 // Switch Operation
 #define CMD_SWITCH              's'
 #define CMD_ADC                 'c'
+#define CMD_TEST                'd'
 
 // NeoPixel operation
 #define CMD_NP_COLOR            'X'
@@ -265,9 +266,38 @@ uint8_t time_stamp[6] = {
 #define ERROR_DIO               'G'
 #define ERROR_UNESCAPE          'U'
 
+#define A 0
+#define B 1
+#define C 2
+#define E 3
+
+#define GPIOA  5
+#define GPIOB  6
+#define GPIOC  9
+#define GPIOE  10
+#define GPIONE 11
+#define GPIOD  12
+
+uint8_t sensor_map[15][7] = 
+{
+  {0,0,0,0},
+  {0,0,1,0},
+  {0,1,0,0},
+  {0,1,1,0},
+  {1,0,0,0},
+  {1,0,1,0},
+  {1,1,0,0},
+  {1,1,1,0},
+  {0,0,0,1},
+  {0,0,1,1},
+  {0,1,0,1},
+  {0,1,1,1},
+  {1,0,0,1},
+  {1,0,1,1},
+  {1,1,0,1},
+};
 
 String ident = "Arduino I2C-to-USB 1.0";
-
 TwoWire **wires;
 
 #if NUM_SW_I2C_BUS > 0
@@ -350,7 +380,14 @@ uint8_t dio_mode = 3;
 
 void setup() {
   // Initialize LED
-  pinMode(LED_BUILTIN, OUTPUT);
+  //pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(GPIOA, OUTPUT);
+  pinMode(GPIOB, OUTPUT);
+  pinMode(GPIOC, OUTPUT);
+  pinMode(GPIOE, OUTPUT);
+  pinMode(GPIONE, OUTPUT);
+  pinMode(GPIOD, OUTPUT);
+  
 
 #ifdef ADAFRUIT_NEOPIXEL_H
   // Initialize NeoPixel
@@ -415,6 +452,9 @@ void setup() {
 
   // Initialize the main communication
   COM_MAIN_BEGIN();
+  analogReadResolution(12);
+  analogReference(AR_INTERNAL2V0);
+  
 }
 
 void resetAdapter() {
@@ -511,12 +551,32 @@ void handleCommand(uint8_t cmd) {
       // Read the sensor index to switch too
       read_buf[0] = COM_MAIN.read();
       // TODO: activate right GPO to set Multiplexers accordingly
+      digitalWrite(GPIOA, sensor_map[read_buf[0]][A]);
+      digitalWrite(GPIOB, sensor_map[read_buf[0]][B]);
+      digitalWrite(GPIOC, sensor_map[read_buf[0]][C]);
+      digitalWrite(GPIOE, sensor_map[read_buf[0]][E]);
+      digitalWrite(GPIONE, ! sensor_map[read_buf[0]][E]);
+      break;
+      
+    
+    case CMD_TEST:
+      while (!COM_MAIN.available()) {
+        delay(1);
+        if (millis() - t0 > 100) {
+          state = STATE_INIT;
+          return;
+        }
+      }
+      // Read the test mode to swtich, 1 for digital and 0 for analog
+      read_buf[0] = COM_MAIN.read();
+      digitalWrite(GPIOD, read_buf[0]);      
       break;
     
     case CMD_ADC:
-      *(short *)read_buf = (short)analogReadDiff(A2, A3);
+      *(short *)read_buf = (short)analogReadDiff(A3, A2);
+      //*(short *)read_buf = (short)1024;
       COM_MAIN.write(read_buf, 2);
-      break;
+      break; 
       
     
     case CMD_I2C_BUS:
